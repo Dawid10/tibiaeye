@@ -1,0 +1,28 @@
+{
+  "description": "Login screen macOS — email field, password field, login button visible",
+  "resolution": "1920x1080",
+  "capture_method": "screen_capture",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": null,
+    "gamewindow": null,
+    "radar": null,
+    "statusbar": null,
+    "skills": null,
+    "actionbar": null,
+    "inventory": null,
+    "connection": {
+      "is_login_screen": true,
+      "is_character_list": false,
+      "login_button": true,
+      "email_field": true,
+      "password_field": true,
+      "enter_game_button": false
+    }
+  },
+
+  "pathfinding": null,
+  "gameplay": null
+}

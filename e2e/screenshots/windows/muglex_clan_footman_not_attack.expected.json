@@ -1,0 +1,45 @@
+{
+  "description": "Muglex Clan Footman on grass - KNOWN LIMITATION: old capture card (1920x1080), templates dont match current setup.",
+  "resolution": "1920x1080",
+  "capture_method": "capture_card",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": {
+      "count": 2,
+      "names": ["Player"],
+      "attacking": null
+    },
+    "gamewindow": {
+      "monster_count": 0,
+      "max_false_positives": 25,
+      "max_bar_noise": 30,
+      "attacking": false
+    },
+    "radar": {
+      "found": true
+    },
+    "statusbar": {
+      "hp_range": [85, 93],
+      "mana_range": [100, 100]
+    },
+    "skills": {
+      "detected": true,
+      "level": 4,
+      "hp": 146,
+      "mana": 70,
+      "capacity": 400,
+      "speed": 113,
+      "stamina": 4158
+    },
+    "actionbar": null,
+    "inventory": null
+  },
+
+  "pathfinding": {
+    "walkable_tile_count_range": [91, 121],
+    "path_to_target_exists": false
+  },
+  "gameplay": null
+}

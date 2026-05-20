@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+env/
+
+# Debug files (keep project clean)
+debug_*.py
+debug_*.png
+debug_*.json
+
+# But keep overlay debug modules
+!src/gui/overlay/debug_*.py
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.prod
+
+# Project specific
+*.db
+.tool-versions
+
+# Local state files (personal config, not for version control)
+gui_config.json
+minimap_region.json
+
+# Claude Code local settings
+.claude/
+
+# Temporary screenshots
+screenshot*.png
+image-*.png
+
+*.log
+capture_*.py
+diagnose_*.
+floor_indicator*.png
+logs/
+captured_monsters/
+profile_*.py
+e2e-test-images/output/
+e2e-test-tasks/output/
+e2e/output/

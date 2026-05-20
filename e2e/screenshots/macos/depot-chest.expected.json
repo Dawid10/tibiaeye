@@ -1,0 +1,33 @@
+{
+  "description": "Depot chests open — depot chest 1-4 icons visible in sidebar",
+  "resolution": "1920x1080",
+  "capture_method": "screen_capture",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": null,
+    "gamewindow": null,
+    "radar": null,
+    "statusbar": {
+      "hp_range": [100, 100],
+      "mana_range": [100, 100]
+    },
+    "skills": {"detected": true},
+    "actionbar": null,
+    "inventory": null,
+    "depot_slots": {
+      "locker": false,
+      "depot": false,
+      "stash": false,
+      "depot_chest_1": true,
+      "depot_chest_2": true,
+      "depot_chest_3": true,
+      "depot_chest_4": true
+    },
+    "connection": null
+  },
+
+  "pathfinding": null,
+  "gameplay": null
+}

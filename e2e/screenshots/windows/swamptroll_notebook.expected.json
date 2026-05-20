@@ -1,0 +1,31 @@
+{
+  "description": "Two swamp trolls (notebook 720p - KNOWN LIMITATION: different resolution/layout, BL icon not found)",
+  "resolution": "720p",
+  "capture_method": "screen_capture",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": {
+      "count": 2,
+      "names": ["Swamp Troll"],
+      "attacking": null
+    },
+    "gamewindow": {
+      "monster_count": 0,
+      "max_false_positives": 5,
+      "max_bar_noise": 10,
+      "attacking": false
+    },
+    "radar": {
+      "found": false
+    },
+    "statusbar": null,
+    "skills": null,
+    "actionbar": null,
+    "inventory": null
+  },
+
+  "pathfinding": null,
+  "gameplay": null
+}

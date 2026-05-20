@@ -1,0 +1,46 @@
+{
+  "description": "Nine wasps in cave (capture card 1080p)",
+  "resolution": "1920x1080",
+  "capture_method": "capture_card",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": {
+      "count": 9,
+      "names": ["Wasp"],
+      "attacking": null
+    },
+    "gamewindow": {
+      "monster_count": 9,
+      "max_false_positives": 1,
+      "max_bar_noise": 12,
+      "attacking": false
+    },
+    "radar": {
+      "found": true
+    },
+    "statusbar": {
+      "hp_range": [100, 100],
+      "mana_range": [100, 100]
+    },
+    "skills": {
+      "detected": true,
+      "level": 42,
+      "hp": 695,
+      "mana": 260,
+      "capacity": 1040,
+      "speed": 151,
+      "stamina": 4158
+    },
+    "actionbar": null,
+    "inventory": null
+  },
+
+  "pathfinding": {
+    "walkable_tile_count_range": [53, 83],
+    "path_to_target_exists": true,
+    "path_max_length": 5
+  },
+  "gameplay": null
+}

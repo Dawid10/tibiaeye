@@ -1,0 +1,38 @@
+{
+  "description": "2 Muglex Clan Footman + 1 Assassin on grass (3 BL slots). Tests hash collision detection — both names normalize to same row-8 hash, resolved via template matching (capture card 2032x1167).",
+  "resolution": "2032x1167",
+  "capture_method": "capture_card",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": {
+      "count": 3,
+      "names": ["Muglex Clan Footman", "Muglex Clan Assassin"],
+      "attacking": null
+    },
+    "gamewindow": {
+      "monster_count": 0,
+      "max_false_positives": 5,
+      "max_bar_noise": 10,
+      "attacking": false
+    },
+    "radar": {
+      "found": true
+    },
+    "statusbar": {
+      "hp_range": [70, 78],
+      "mana_range": [100, 100]
+    },
+    "skills": {"detected": true},
+    "actionbar": null,
+    "inventory": null
+  },
+
+  "pathfinding": {
+    "walkable_tile_count_range": [85, 115],
+    "path_to_target_exists": true,
+    "path_max_length": 5
+  },
+  "gameplay": null
+}

@@ -1,0 +1,64 @@
+{
+  "name": "Example Hunt with Refill",
+  "description": "Example route demonstrating the auto-refill system",
+  "waypoints": [
+    {
+      "label": "hunt_start",
+      "type": "walk",
+      "coordinate": [33200, 32450, 7],
+      "comment": "Start of hunt loop"
+    },
+    {
+      "type": "refillChecker",
+      "comment": "Check if refill needed - settings come from GUI (Refill Settings section)"
+    },
+    {
+      "type": "walk",
+      "coordinate": [33212, 32456, 7],
+      "comment": "Walk to bank NPC"
+    },
+    {
+      "type": "depositGold",
+      "comment": "Deposit all gold at banker"
+    },
+    {
+      "type": "walk",
+      "coordinate": [33213, 32454, 7],
+      "comment": "Walk to depot"
+    },
+    {
+      "type": "depositItems",
+      "options": {
+        "city": "Darashia",
+        "lootBackpack": "loot",
+        "depositMethod": "drag"
+      },
+      "comment": "Deposit loot at depot"
+    },
+    {
+      "type": "walk",
+      "coordinate": [33192, 32432, 7],
+      "comment": "Walk to potion NPC (Alesar)"
+    },
+    {
+      "type": "refill",
+      "options": {
+        "healthPotion": {
+          "item": "Great Health Potion",
+          "quantity": 100
+        },
+        "manaPotion": {
+          "item": "Strong Mana Potion",
+          "quantity": 200
+        },
+        "useGui": false
+      },
+      "comment": "Buy potions from NPC"
+    },
+    {
+      "type": "walk",
+      "coordinate": [33200, 32450, 7],
+      "comment": "Return to hunt start"
+    }
+  ]
+}

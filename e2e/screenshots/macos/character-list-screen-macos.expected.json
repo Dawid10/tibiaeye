@@ -1,0 +1,28 @@
+{
+  "description": "Character list screen macOS — character list visible, enter game button",
+  "resolution": "1920x1080",
+  "capture_method": "screen_capture",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": null,
+    "gamewindow": null,
+    "radar": null,
+    "statusbar": null,
+    "skills": null,
+    "actionbar": null,
+    "inventory": null,
+    "connection": {
+      "is_login_screen": false,
+      "is_character_list": true,
+      "login_button": false,
+      "email_field": false,
+      "password_field": false,
+      "enter_game_button": true
+    }
+  },
+
+  "pathfinding": null,
+  "gameplay": null
+}

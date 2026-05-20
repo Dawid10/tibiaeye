@@ -1,0 +1,46 @@
+{
+  "description": "Single rotworm on lava terrain (capture card 1080p)",
+  "resolution": "1920x1080",
+  "capture_method": "capture_card",
+  "capture_date": null,
+  "tibia_client_version": null,
+
+  "repositories": {
+    "battlelist": {
+      "count": 1,
+      "names": ["Rotworm"],
+      "attacking": null
+    },
+    "gamewindow": {
+      "monster_count": 1,
+      "max_false_positives": 0,
+      "max_bar_noise": 2,
+      "attacking": false
+    },
+    "radar": {
+      "found": true
+    },
+    "statusbar": {
+      "hp_range": [100, 100],
+      "mana_range": [100, 100]
+    },
+    "skills": {
+      "detected": true,
+      "level": 38,
+      "hp": 635,
+      "mana": 240,
+      "capacity": 1064,
+      "speed": 147,
+      "stamina": 4200
+    },
+    "actionbar": null,
+    "inventory": null
+  },
+
+  "pathfinding": {
+    "walkable_tile_count_range": [34, 64],
+    "path_to_target_exists": true,
+    "path_max_length": 5
+  },
+  "gameplay": null
+}

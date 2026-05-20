@@ -1,0 +1,109 @@
+{
+  "healing": {
+    "healthPotion": {
+      "enabled": true,
+      "threshold": 31,
+      "hotkey": "1",
+      "cooldown": 1.0
+    },
+    "manaPotion": {
+      "enabled": true,
+      "threshold": 20,
+      "hotkey": "2",
+      "cooldown": 1.0
+    },
+    "spells": [
+      {
+        "enabled": true,
+        "name": "Exura Ico",
+        "threshold": 70,
+        "spell": "exura ico",
+        "minMana": 10,
+        "hotkey": "F4"
+      }
+    ],
+    "food": {
+      "enabled": false,
+      "threshold": 5,
+      "hotkey": "f",
+      "cooldown": 2.0
+    }
+  },
+  "cavebot": {
+    "routeFile": "./routes/onboarding.json",
+    "startWaypoint": 0,
+    "loop": true
+  },
+  "refill": {
+    "city": "Venore",
+    "hpPotionMin": 50,
+    "mpPotionMin": 100,
+    "capMin": 200,
+    "checkCapacity": false,
+    "hpPotionTarget": 200,
+    "mpPotionTarget": 400,
+    "hpPotionItem": "Health Potion",
+    "mpPotionItem": "Mana Potion",
+    "depositGold": true,
+    "depositLoot": true,
+    "dropFlasks": true,
+    "lootBackpack": "Camouflage Backpack",
+    "mainBackpack": "Brocade Backpack",
+    "stashBackpack": "Beach Backpack",
+    "depotChest": 2,
+    "returnLabel": "huntStart"
+  },
+  "general": {
+    "tickRate": 0.1,
+    "enableHealing": false,
+    "enableCavebot": true,
+    "enableLoot": true,
+    "lootHotkey": "g",
+    "stuckAlertTimeout": 60,
+    "enableStuckAlert": true,
+    "enableLogging": true,
+    "window": "Tibia - YourCharacterName",
+    "enableGameWindowValidation": true,
+    "showOverlay": false,
+    "showDebugOverlay": false
+  },
+  "targeting": {
+    "enabled": true,
+    "mode": "whitelist",
+    "whitelist": [
+      "rotworm"
+    ],
+    "blacklist": []
+  },
+  "recorder": {
+    "outputFile": "./routes/my_route.json",
+    "ropeHotkey": "o",
+    "shovelHotkey": "p",
+    "direction": "north"
+  },
+  "reconnect": {
+    "enabled": false,
+    "email": "your@email.com",
+    "password": "",
+    "maxRetries": 10,
+    "delayBetweenRetries": 5.0,
+    "backoffIncrement": 5.0,
+    "backoffMaxDelay": 60.0
+  },
+  "spellAttack": {
+    "enabled": false,
+    "manaReservePercent": 30,
+    "groups": []
+  },
+  "hardware": {
+    "mode": "software",
+    "arduinoPort": "",
+    "captureDevice": 0
+  },
+  "serverSave": {
+    "enabled": false,
+    "time": "10:00",
+    "windowMinutes": 5,
+    "waitAfterKickSeconds": 90
+  }
+}
