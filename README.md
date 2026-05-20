@@ -134,7 +134,7 @@ Despite all of this — **my character got banned**. BattleEye doesn't need to s
 
 ## 📊 Telemetry & Real-time Dashboard
 
-The bot streams data to a companion platform — **[tibia-services](https://github.com/GGotha/tibia-services)** — via HTTP + WebSocket:
+The bot streams data to a companion platform — **[tibiaeye-monorepo](https://github.com/GGotha/tibiaeye-monorepo)** — via HTTP + WebSocket:
 
 - Kill events, loot, XP — batched HTTP
 - Live character position — WebSocket (every tick)
@@ -306,7 +306,7 @@ But other priorities in life got in the way and I had to step back. I intend to 
 
 | Project | Description |
 |---------|-------------|
-| [tibia-services](https://github.com/GGotha/tibia-services) | Node.js monorepo — NestJS API + React dashboard + livemap |
+| [tibiaeye-monorepo](https://github.com/GGotha/tibiaeye-monorepo) | Node.js monorepo — NestJS API + React dashboard + livemap |
 | [PyTibia](https://github.com/lucasmonstro/PyTibia) | The original open-source bot this project was inspired by |
 
 ---
@@ -339,4 +339,4 @@ But other priorities in life got in the way and I had to step back. I intend to 
 
 ---
 
-*Built for learning. Used in production. Got banned. 10/10 would build again.*
+*Built for learning. Used in production. Got banned.*
