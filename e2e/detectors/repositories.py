@@ -231,7 +231,8 @@ def detect_gamewindow(
     if not creature_names:
         pass  # get_creatures handles empty names gracefully
 
-    gw_creatures = gw_repo.get_creatures(creature_names, coordinate, screenshot_gray)
+    gw_creatures = gw_repo.get_creatures(creature_names, coordinate, screenshot_gray,
+                                         screenshot_bgr=screenshot_bgr)
     gw_repo.mark_attacked(gw_creatures, attacked_name, screenshot_bgr)
 
     monsters = gw_repo.get_monsters(gw_creatures)

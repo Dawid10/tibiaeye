@@ -412,6 +412,11 @@ class CavebotTab(ctk.CTkFrame):
         self.start_waypoint_var.set(str(index))
         self.waypoint_list.set_current_index(index)
 
+    def reload(self, config_manager):
+        """Show another profile's settings in the existing widgets."""
+        self.config_manager = config_manager
+        self._load_config()
+
     def _load_config(self):
         """Load configuration from config manager."""
         if not self.config_manager:

@@ -261,6 +261,15 @@ python gui.py                  # GUI mode
 python main.py --help          # CLI mode
 ```
 
+### Dry run
+
+`--dry-run` (works with both `gui.py` and `main.py`) runs the full detection and decision pipeline but prints every key press, click and mouse move as `[DRY RUN] press('3')` instead of sending it. Use it to check hotkeys, targeting and waypoints before letting the bot touch the game. Arduino input is skipped while it is active.
+
+```bash
+python main.py --dry-run --no-cavebot   # watch what healing would press
+python gui.py --dry-run
+```
+
 ### Arduino setup
 
 1. Flash `firmware/tibiaeye_hid/tibiaeye_hid.ino` to an **Arduino Leonardo** via Arduino IDE.

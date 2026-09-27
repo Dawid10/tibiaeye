@@ -140,6 +140,11 @@ class HardwareTab(ctk.CTkScrollableFrame):
         )
         self.status_label.pack(side="left", padx=10)
 
+    def reload(self, config_manager):
+        """Show another profile's settings in the existing widgets."""
+        self.config_manager = config_manager
+        self._load_config()
+
     def _load_config(self):
         """Load saved hardware config."""
         if not self.config_manager:

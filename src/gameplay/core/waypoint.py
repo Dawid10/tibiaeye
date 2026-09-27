@@ -381,6 +381,37 @@ def jump_to_closest_waypoint(context: Dict[str, Any], force: bool = False) -> bo
     return True
 
 
+def jump_back_to_current_floor(context: Dict[str, Any]) -> bool:
+    """
+    After a failed floor change, rewind to the last walk waypoint on our floor
+    so the floor-change waypoint that follows it gets retried.
+    """
+    current_coord = context.get('radar', {}).get('coordinate')
+    if current_coord is None:
+        return False
+
+    waypoints_data = context.get('cavebot', {}).get('waypoints', {})
+    waypoints = waypoints_data.get('items', [])
+    current_index = waypoints_data.get('currentIndex', 0)
+    total = len(waypoints)
+
+    for offset in range(1, total):
+        candidate_index = (current_index - offset) % total
+        waypoint = waypoints[candidate_index]
+        wp_coord = waypoint.get('coordinate')
+        if wp_coord is None or wp_coord[2] != current_coord[2]:
+            continue
+        if waypoint.get('type', 'walk') != 'walk':
+            continue
+        # SetNextWaypoint runs after this and adds 1
+        waypoints_data['currentIndex'] = (candidate_index - 1) % total
+        print(f"[Walk] Wrong floor {current_coord[2]} for waypoint {current_index} - "
+              f"going back to waypoint {candidate_index} to retry the floor change")
+        return True
+
+    return False
+
+
 def resolve_goal_coordinate(coordinate: Coordinate, waypoint: Dict[str, Any]) -> Checkpoint:
     """
     Resolve goal and check-in coordinates for a waypoint.

@@ -14,7 +14,11 @@ from ...core.constants import (
     CONFIDENCE_UI_DEFAULT, CONFIDENCE_UI_BUTTON, CONFIDENCE_DEPOT,
     CONFIDENCE_ARROW_HIGH, CONFIDENCE_ARROW_MED, CONFIDENCE_ARROW_LOW,
 )
-from .config import IMAGES_PATH, load_gray_image
+from .config import (
+    IMAGES_PATH, load_gray_image,
+    MAP_TOP_DEFAULT_OFFSET, MAP_TOP_SEARCH_ROWS, MAP_FRAME_DARK_MAX, MAP_FRAME_UNIFORM_MAX_STD,
+    MAP_FRAME_BEVEL_MIN_CONTRAST, MAP_TEXTURE_MIN_STD, MAP_TEXTURE_CHECK_ROWS, MAP_TOP_MAX_ATTEMPTS,
+)
 
 
 def locate(img: np.ndarray, template: np.ndarray,
@@ -80,9 +84,54 @@ def find_right_arrow(screenshot: np.ndarray, arrow_images: dict,
     return None
 
 
+def _is_map_top_frame(screenshot: np.ndarray, x: int, y: int, width: int, height: int) -> bool:
+    top = screenshot[y, x:x + width]
+    bottom = screenshot[y + height + 1, x:x + width]
+    if top.mean() >= MAP_FRAME_DARK_MAX or top.std() >= MAP_FRAME_UNIFORM_MAX_STD:
+        return False
+    if bottom.std() >= MAP_FRAME_UNIFORM_MAX_STD:
+        return False
+    if bottom.mean() < top.mean() + MAP_FRAME_BEVEL_MIN_CONTRAST:
+        return False
+    below = screenshot[y + 1:y + 1 + MAP_TEXTURE_CHECK_ROWS, x:x + width]
+    return below.std(axis=1).mean() >= MAP_TEXTURE_MIN_STD
+
+
+def find_map_top(screenshot: np.ndarray, x: int, arrow_y: int,
+                 width: int = 960, height: int = 704) -> Optional[int]:
+    """First row of the map, found by its beveled frame below the side arrows."""
+    for y in range(arrow_y, arrow_y + MAP_TOP_SEARCH_ROWS):
+        if y + height + 1 >= screenshot.shape[0]:
+            return None
+        if _is_map_top_frame(screenshot, x, y, width, height):
+            return y + 1
+    return None
+
+
+def _get_map_top_offset(screenshot: np.ndarray, x: int, arrow_y: int, top_cache: dict) -> int:
+    """Offset from arrows to the map top; learned once, like the arrow positions."""
+    if top_cache.get('offset') is not None:
+        return top_cache['offset']
+    if top_cache.get('attempts', 0) >= MAP_TOP_MAX_ATTEMPTS:
+        return MAP_TOP_DEFAULT_OFFSET
+
+    top_cache['attempts'] = top_cache.get('attempts', 0) + 1
+    top = find_map_top(screenshot, x, arrow_y)
+    if top is None:
+        if top_cache['attempts'] == MAP_TOP_MAX_ATTEMPTS:
+            print("[GameWindow] WARNING: map frame of 960x704 not found. If the map looks smaller than usual "
+                  "(taller chat / smaller window), clicks will miss - drag the chat smaller until the map is full size")
+        return MAP_TOP_DEFAULT_OFFSET
+
+    top_cache['offset'] = top - arrow_y
+    print(f"[GameWindow] Map top found {top_cache['offset']}px below the side arrows")
+    return top_cache['offset']
+
+
 def get_game_window_position(screenshot: np.ndarray, arrow_images: dict,
                              left_cache: dict,
-                             right_cache: dict) -> Optional[Tuple[int, int, int, int]]:
+                             right_cache: dict,
+                             top_cache: Optional[dict] = None) -> Optional[Tuple[int, int, int, int]]:
     left_pos = find_left_arrow(screenshot, arrow_images, left_cache)
     if left_pos is None:
         return None
@@ -92,7 +141,9 @@ def get_game_window_position(screenshot: np.ndarray, arrow_images: dict,
         return None
 
     x = ((left_pos[0] + 7 + right_pos[0]) // 2) - 480
-    y = left_pos[1] + 5
+    if top_cache is None:
+        top_cache = {}
+    y = left_pos[1] + _get_map_top_offset(screenshot, x, left_pos[1], top_cache)
     width = 960
     height = 704
 

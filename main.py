@@ -9,6 +9,7 @@ Usage:
     python main.py --env prod               # Run with production environment
     python main.py --gui --env prod         # GUI with production environment
     python main.py --waypoints hunt.json    # Load waypoints from file
+    python main.py --dry-run                # Log key/mouse input instead of sending it
 
 Controls:
     Ctrl+C  - Stop the bot
@@ -86,6 +87,8 @@ def parse_args():
                         help='Log every command sent to Arduino')
     parser.add_argument('--env', choices=['local', 'prod'], default='local',
                         help='Environment to use (default: local)')
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Log every key press/click instead of sending it')
     return parser.parse_args()
 
 
@@ -330,6 +333,10 @@ def check_radar():
 
 def main():
     args = parse_args()
+
+    if args.dry_run:
+        from src.utils.dry_run import enable_dry_run
+        enable_dry_run()
 
     # Launch GUI mode if requested
     if args.gui:

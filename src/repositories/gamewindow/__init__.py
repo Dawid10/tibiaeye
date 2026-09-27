@@ -50,6 +50,7 @@ class GameWindowRepository:
         self._game_window_position: Optional[Tuple[int, int, int, int]] = None
         self._left_arrow_cache: Dict = {'arrow': None, 'position': None, 'hash': None}
         self._right_arrow_cache: Dict = {'arrow': None, 'position': None, 'hash': None}
+        self._map_top_cache: Dict = {}
 
         self._resolution = 1080
         self._slot_width = 64
@@ -65,7 +66,8 @@ class GameWindowRepository:
 
         pos = get_game_window_position(
             screenshot, self._arrow_images,
-            self._left_arrow_cache, self._right_arrow_cache
+            self._left_arrow_cache, self._right_arrow_cache,
+            self._map_top_cache
         )
         if pos is not None:
             self._game_window_position = pos
@@ -91,7 +93,8 @@ class GameWindowRepository:
                       coordinate: Tuple[int, int, int],
                       screenshot: np.ndarray = None,
                       direction: Optional[str] = None,
-                      walked_pixels: int = 0) -> List[GameWindowCreature]:
+                      walked_pixels: int = 0,
+                      screenshot_bgr: Optional[np.ndarray] = None) -> List[GameWindowCreature]:
         if screenshot is None:
             screenshot = self._screen.capture(grayscale=True)
 
@@ -100,12 +103,16 @@ class GameWindowRepository:
             return []
 
         gw_pos = self._game_window_position or (0, 0, 960, 704)
+        color_game_window = None
+        if screenshot_bgr is not None:
+            x, y, w, h = gw_pos
+            color_game_window = screenshot_bgr[y:y + h, x:x + w]
 
         return get_creatures(
             battle_list_names, coordinate, game_window, gw_pos,
             self._slot_width, self._monster_templates,
             self._logged_warnings, direction, walked_pixels,
-            self._char_atlas_manager
+            self._char_atlas_manager, color_game_window
         )
 
     def mark_attacked(self, creatures: List[GameWindowCreature],

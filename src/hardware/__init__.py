@@ -58,6 +58,12 @@ def init_hardware(mode: str = MODE_SOFTWARE,
         print("Hardware mode: capture_card (pyautogui + capture card)")
         return
 
+    from ..utils.dry_run import is_dry_run
+    if is_dry_run():
+        print("Dry run active: skipping Arduino input (would replace the dry-run loggers).")
+        _active_mode = MODE_SOFTWARE
+        return
+
     # Arduino modes need a serial connection
     port = arduino_port or _auto_detect_arduino()
     if not port:

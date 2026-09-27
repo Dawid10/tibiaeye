@@ -27,6 +27,11 @@ class BotControlTab(ctk.CTkScrollableFrame):
         on_overlay_toggle: Optional[Callable] = None,
         on_debug_overlay_toggle: Optional[Callable] = None,
         config_manager = None,
+        profiles: Optional[list] = None,
+        active_profile: str = "",
+        on_profile_switch: Optional[Callable] = None,
+        on_profile_create: Optional[Callable] = None,
+        on_profile_delete: Optional[Callable] = None,
         **kwargs
     ):
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -37,11 +42,17 @@ class BotControlTab(ctk.CTkScrollableFrame):
         self.on_overlay_toggle = on_overlay_toggle
         self.on_debug_overlay_toggle = on_debug_overlay_toggle
         self.config_manager = config_manager
+        self._profiles = profiles or []
+        self._active_profile = active_profile
+        self.on_profile_switch = on_profile_switch
+        self.on_profile_create = on_profile_create
+        self.on_profile_delete = on_profile_delete
 
         self._setup_ui()
 
     def _setup_ui(self):
         """Setup the bot control tab UI."""
+        self._setup_profile_section()
         self._setup_controls_section()
         self._setup_modules_section()
         self._setup_server_save_section()
@@ -160,6 +171,80 @@ class BotControlTab(ctk.CTkScrollableFrame):
             style="default", width=60,
         ).pack(side="left")
 
+    def reload(self, config_manager, profiles, active_profile):
+        """Show another profile's settings in the existing widgets."""
+        self.config_manager = config_manager
+        get = config_manager.get
+        self._profiles = profiles
+        self.profile_menu.configure(values=profiles)
+        self.profile_var.set(active_profile)
+        self.tick_rate_var.set(str(get('general.tickRate', 0.100)))
+        saved_window = get('general.window', '')
+        self.window_var.set(saved_window if saved_window in self._window_options else "Full Screen")
+        self.healing_var.set(get('general.enableHealing', True))
+        self.cavebot_var.set(get('general.enableCavebot', True))
+        self.loot_var.set(get('general.enableLoot', True))
+        self.loot_hotkey_var.set(get('general.lootHotkey', 'g'))
+        self.chase_var.set(get('general.chaseWithClient', True))
+        self.chase_hotkey_var.set(get('general.chaseHotkey', 'p'))
+        self.map_walk_var.set(get('general.mapClickWalking', True))
+        self.stuck_alert_var.set(get('general.enableStuckAlert', True))
+        self.stuck_timeout_var.set(str(get('general.stuckAlertTimeout', 120)))
+        self.logging_var.set(get('general.enableLogging', False))
+        self.overlay_var.set(get('general.showOverlay', False))
+        self.debug_overlay_var.set(get('general.showDebugOverlay', False))
+        self.server_save_var.set(get('serverSave.enabled', True))
+        self.server_save_time_var.set(get('serverSave.time', '10:00'))
+        self.reconnect_var.set(get('reconnect.enabled', False))
+        self.reconnect_email_var.set(get('reconnect.email', ''))
+        self.reconnect_password_var.set(get('reconnect.password', ''))
+
+    def _setup_profile_section(self):
+        profile_section = create_section(self, "Profile")
+        profile_section.pack(fill="x", padx=10, pady=5)
+
+        profile_frame = ctk.CTkFrame(profile_section, fg_color="transparent")
+        profile_frame.pack(fill="x", padx=10, pady=10)
+
+        self.profile_var = ctk.StringVar(value=self._active_profile)
+        self.profile_menu = profile_menu = create_option_menu(
+            profile_frame,
+            variable=self.profile_var,
+            values=self._profiles,
+            width=200,
+            command=self._on_profile_selected,
+        )
+        profile_menu.pack(side="left", padx=(0, 5))
+        Tooltip(profile_menu, "Each profile (vocation or character) keeps its own healing, targeting, cavebot and hotkeys.")
+
+        create_button(
+            profile_frame, "New", self._on_new_profile,
+            style="default", width=60,
+        ).pack(side="left", padx=(0, 5))
+
+        create_button(
+            profile_frame, "Delete", self._on_delete_profile,
+            style="danger", width=60,
+        ).pack(side="left")
+
+    def _on_profile_selected(self, name):
+        if self.on_profile_switch:
+            self.on_profile_switch(name)
+
+    def _on_new_profile(self):
+        dialog = ctk.CTkInputDialog(text="Profile name (copies the current one):", title="New Profile")
+        name = dialog.get_input()
+        if name and self.on_profile_create:
+            self.on_profile_create(name)
+
+    def _on_delete_profile(self):
+        from tkinter import messagebox
+        name = self.profile_var.get()
+        if not messagebox.askyesno("Delete Profile", f"Delete profile '{name}' and its settings?"):
+            return
+        if self.on_profile_delete:
+            self.on_profile_delete(name)
+
     def _setup_modules_section(self):
         modules_section = create_section(self, "Active Modules")
         modules_section.pack(fill="x", padx=10, pady=5)
@@ -184,6 +269,18 @@ class BotControlTab(ctk.CTkScrollableFrame):
         ).pack(anchor="w", pady=2)
 
         self._setup_loot_row(modules_frame)
+        self._setup_chase_row(modules_frame)
+
+        self.map_walk_var = ctk.BooleanVar(
+            value=self.config_manager.get('general.mapClickWalking', True) if self.config_manager else True
+        )
+        map_walk_box = create_checkbox(
+            modules_frame, "Walk by clicking the minimap", self.map_walk_var,
+            command=self._on_module_change,
+        )
+        map_walk_box.pack(anchor="w", pady=2)
+        Tooltip(map_walk_box, "Waypoints 3+ tiles away use the client's auto-walk (smooth). Off: arrow-key steps.")
+
         self._setup_stuck_row(modules_frame)
 
         self.logging_var = ctk.BooleanVar(
@@ -230,6 +327,28 @@ class BotControlTab(ctk.CTkScrollableFrame):
         create_entry(loot_frame, self.loot_hotkey_var, width=40).pack(side="left", padx=2)
 
         ctk.CTkLabel(loot_frame, text=")").pack(side="left")
+
+    def _setup_chase_row(self, parent):
+        chase_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        chase_frame.pack(anchor="w", pady=2)
+
+        self.chase_var = ctk.BooleanVar(
+            value=self.config_manager.get('general.chaseWithClient', True) if self.config_manager else True
+        )
+        chase_box = create_checkbox(
+            chase_frame, "Client Chase Mode (keep on with hotkey:", self.chase_var,
+            command=self._on_module_change,
+        )
+        chase_box.pack(side="left")
+        Tooltip(chase_box, "Tibia's Chase Opponent follows the target. The bot presses the hotkey whenever the chase button isn't green. Off: the bot walks to monsters itself.")
+
+        self.chase_hotkey_var = ctk.StringVar(
+            value=self.config_manager.get('general.chaseHotkey', 'p') if self.config_manager else 'p'
+        )
+        self.chase_hotkey_var.trace_add("write", lambda *args: self._on_module_change())
+        create_entry(chase_frame, self.chase_hotkey_var, width=40).pack(side="left", padx=2)
+
+        ctk.CTkLabel(chase_frame, text=")").pack(side="left")
 
     def _setup_stuck_row(self, parent):
         stuck_frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -428,6 +547,9 @@ class BotControlTab(ctk.CTkScrollableFrame):
         self.config_manager.set('general.enableCavebot', self.cavebot_var.get())
         self.config_manager.set('general.enableLoot', self.loot_var.get())
         self.config_manager.set('general.lootHotkey', self.loot_hotkey_var.get())
+        self.config_manager.set('general.chaseWithClient', self.chase_var.get())
+        self.config_manager.set('general.chaseHotkey', self.chase_hotkey_var.get())
+        self.config_manager.set('general.mapClickWalking', self.map_walk_var.get())
         self.config_manager.set('general.enableLogging', self.logging_var.get())
         self.config_manager.set('general.enableStuckAlert', self.stuck_alert_var.get())
         try:
@@ -552,6 +674,9 @@ class BotControlTab(ctk.CTkScrollableFrame):
             'enableCavebot': self.cavebot_var.get(),
             'enableLoot': self.loot_var.get(),
             'lootHotkey': self.loot_hotkey_var.get(),
+            'chaseWithClient': self.chase_var.get(),
+            'chaseHotkey': self.chase_hotkey_var.get(),
+            'mapClickWalking': self.map_walk_var.get(),
             'enableStuckAlert': self.stuck_alert_var.get(),
             'stuckAlertTimeout': stuck_timeout,
             'enableLogging': self.logging_var.get(),

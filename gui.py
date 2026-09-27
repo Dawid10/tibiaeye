@@ -7,6 +7,7 @@ Launch the graphical interface for the bot.
 Usage:
     python gui.py                # Local environment (default)
     python gui.py --env prod     # Production environment
+    python gui.py --dry-run      # Log key/mouse input instead of sending it
 
 Requires:
     pip install customtkinter
@@ -46,6 +47,10 @@ pyautogui.FAILSAFE = False  # Don't stop when mouse moves to corner
 pyautogui.PAUSE = 0  # No delay between pyautogui commands
 
 import src.utils.input  # noqa: F401 - patches pyautogui with screen offset
+
+if "--dry-run" in sys.argv:
+    from src.utils.dry_run import enable_dry_run
+    enable_dry_run()
 
 from src.gui import TibiaVisionGUI
 

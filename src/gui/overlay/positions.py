@@ -11,7 +11,7 @@ from ...repositories.battlelist.config import load_icon_image, CONTENT_WIDTH
 from ...repositories.gamewindow.core import find_left_arrow, find_right_arrow
 from ...repositories.gamewindow.config import load_arrow_images
 from ...repositories.radar.locators import get_radar_tools_position
-from ...repositories.radar.config import dimensions as radar_dimensions
+from ...repositories.radar.extractors import get_radar_bbox
 from ...repositories.actionBar.core import ActionBarRepository, _locate as ab_locate
 
 # BattleList uses its own cache dict (locator takes cache as param)
@@ -110,12 +110,7 @@ def get_overlay_regions(screenshot_gray: np.ndarray) -> List[Dict]:
     # Radar/Minimap region: derived from tools position
     radar_pos = get_radar_tools_position(screenshot_gray)
     if radar_pos is not None:
-        x, y, w, h = radar_pos
-        radar_w = radar_dimensions['width']
-        radar_h = radar_dimensions['height']
-        radar_x = x
-        radar_y = y - radar_h - 2
-        regions.append({'name': 'Radar', 'bbox': (radar_x, radar_y, radar_w, radar_h)})
+        regions.append({'name': 'Radar', 'bbox': get_radar_bbox(radar_pos)})
 
     # Action Bar region: from left arrows position
     _init_actionbar()

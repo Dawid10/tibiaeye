@@ -19,7 +19,10 @@ from ..core.constants import (
     UNREACHABLE_TARGET_GRACE_SECONDS, UNREACHABLE_BLACKLIST_DURATION,
     UNREACHABLE_BLACKLIST_RADIUS, COMBAT_NO_KILL_TIMEOUT,
     SAFE_MODE_RECOVERY_INTERVAL, SAFE_MODE_RECOVERY_TIMEOUT,
+    CHASE_WITH_CLIENT, CHASE_MODE_HOTKEY, CHASE_CHECK_INTERVAL, CHASE_PRESS_COOLDOWN,
 )
+from ..repositories.combat_mode import count_chase_button_green, is_chase_mode_on
+from ..repositories.radar.locators import get_radar_tools_position
 from .bot_health import BotHealth
 from ..utils.session_logger import SessionLogger
 from ..utils.alerts import get_alert_system
@@ -115,6 +118,8 @@ class GameLoop:
 
         # Food timer
         self._last_food_time = 0
+        self._last_chase_check = 0
+        self._last_chase_press = 0
 
         # Session logger for detailed tracking
         self.session_logger: Optional[SessionLogger] = None
@@ -443,7 +448,8 @@ class GameLoop:
             creatures = self._gamewindow_repo.get_creatures(
                 creature_names, coordinate, screenshot,
                 direction=self._coming_from_direction,
-                walked_pixels=self._walked_pixels_in_sqm)
+                walked_pixels=self._walked_pixels_in_sqm,
+                screenshot_bgr=context.get('screenshotBgr'))
 
             # Cross-reference BL attack info to mark correct GW creature.
             # GW grayscale detection (76/166) fails on capture card;
@@ -598,6 +604,10 @@ class GameLoop:
             context['skills']['food'] = food
 
         speed = get_speed(screenshot)
+        # Buffed/debuffed speed is drawn green/red, too dark in grayscale; brightest channel keeps it readable
+        screenshot_bgr = context.get('screenshotBgr')
+        if not speed and screenshot_bgr is not None:
+            speed = get_speed(screenshot_bgr.max(axis=2))
         if speed is not None and speed > 0:
             context['skills']['speed'] = speed
             context['playerSpeed'] = speed
@@ -1042,6 +1052,10 @@ class GameLoop:
         # 2.5 Anti-trap: attack directly when surrounded (no BFS path)
         self._check_trap()
 
+        # Cavebot switched off live ([ hotkey): drop its walk/attack task, healing keeps running
+        if not self.context.get('cavebot', {}).get('enabled', False) and not self.orchestrator.is_idle:
+            self.orchestrator.clear()
+
         # 3. Execute task orchestrator
         try:
             self.context = self.orchestrator.do(self.context)
@@ -1072,6 +1086,9 @@ class GameLoop:
 
         # 5. Eat food periodically
         self._eat_food_if_needed()
+
+        # 5.5 Keep the client's Chase Opponent mode on
+        self._ensure_chase_mode()
 
         # 6. Check if character is stuck
         self._check_stuck()
@@ -1358,6 +1375,35 @@ class GameLoop:
                 pyautogui.press(hotkey)
                 self._last_food_time = now
                 print(f"[Food] Eating food! Food was: {food} min (hotkey: {hotkey})")
+
+    def _ensure_chase_mode(self) -> None:
+        """Press the chase hotkey when the chase button isn't green (like the Real-tibia-heal bot)."""
+        cavebot = self.context.get('cavebot', {})
+        if not cavebot.get('chaseWithClient', CHASE_WITH_CLIENT) or not cavebot.get('enabled', False):
+            return
+        now = time.time()
+        if now - self._last_chase_check < CHASE_CHECK_INTERVAL:
+            return
+        self._last_chase_check = now
+
+        screenshot = self.context.get('screenshot')
+        screenshot_bgr = self.context.get('screenshotBgr')
+        if screenshot is None or screenshot_bgr is None:
+            return
+        tools = get_radar_tools_position(screenshot)
+        if tools is None:
+            return
+        green = count_chase_button_green(screenshot_bgr, tools)
+        if green is None or is_chase_mode_on(green):
+            return
+        if now - self._last_chase_press < CHASE_PRESS_COOLDOWN:
+            return
+
+        import pyautogui
+        hotkey = cavebot.get('chaseHotkey', CHASE_MODE_HOTKEY)
+        pyautogui.press(hotkey)
+        self._last_chase_press = now
+        print(f"[Chase] Chase mode OFF ({green} green px) - pressing {hotkey.upper()}")
 
     def _check_trap(self) -> None:
         """Engage anti-trap attack when surrounded by creatures with no BFS path."""

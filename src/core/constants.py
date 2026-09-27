@@ -35,6 +35,21 @@ WALK_PROGRESS_TIMEOUT = 5.0    # Seconds without progress before skip
 WALK_STUCK_COUNT = 15          # Stuck ticks before recalculating
 WALK_MAX_RECALCULATIONS = 5    # Max path recalculations before skip
 WALK_RETRY_SAME_DIRECTION = 2  # Retries in same direction when blocked
+WALK_PREWALK_RATIO = 0.7       # Press next step at 70% of step time; client queues it -> no stop between tiles
+WALK_MAP_CLICK_ENABLED = True           # Default when the profile has no general.mapClickWalking (CLI)
+WALK_MAP_CLICK_MIN_DISTANCE = 3         # Shorter walks use keys
+WALK_MAP_CLICK_STALL_TIMEOUT = 1.5      # Seconds without moving before re-click / key fallback
+WALK_MAP_CLICK_MAX_RETRIES = 1          # Re-clicks before falling back to keys
+WALK_MAP_CLICK_ARRIVE_DISTANCE = 2      # Tiles from a walk waypoint to move on when the next one is also a walk
+MINIMAP_CLICK_MARGIN = 3                # Keep clicks this many pixels inside the minimap edge
+CHASE_WITH_CLIENT = True                # Default when the profile has no general.chaseWithClient (CLI)
+CHASE_MODE_HOTKEY = 'p'                 # Default when the profile has no general.chaseHotkey (CLI)
+CHASE_CHECK_INTERVAL = 2.0              # Seconds between reads of the chase button
+CHASE_PRESS_COOLDOWN = 10.0             # Min seconds between presses (the hotkey toggles; avoids an on/off loop)
+CHASE_BUTTON_OFFSET_FROM_RADAR_TOOLS = (10, 97)  # Running-figure button center relative to radar tools top-left
+CHASE_BUTTON_BOX = 15                   # Square sampled around the button center (px)
+CHASE_BUTTON_MIN_GREEN_PIXELS = 10      # Green pixels needed to call chase ON (OFF reads 0)
+CHASE_BUTTON_GREEN_MARGIN = 40          # G must exceed R and B by this to count as green
 WALK_CREATURE_RECALC_DISTANCE = 2   # Min tiles target must move to trigger recalc
 WALK_CREATURE_RECALC_INTERVAL = 0.5  # Seconds between forced recalcs when target jitters
 
@@ -204,3 +219,16 @@ SAFE_MODE_RECOVERY_TIMEOUT = 30.0      # Max seconds to attempt recovery before 
 # ============================================
 SERVER_SAVE_WINDOW_MINUTES = 5             # Minutes around save to suppress alerts
 SERVER_SAVE_RECONNECT_EXTRA_WAIT = 90      # Extra seconds to wait before reconnecting after SS
+
+# ============================================
+# GUI GLOBAL HOTKEY
+# ============================================
+HOTKEY_TOGGLE_BOT = ']'                    # Start/stop the bot from any focused window (Tibia included)
+HOTKEY_TOGGLE_CAVEBOT = '['                # Cavebot (walking + attacking) on/off, even while running; healing stays on
+TOAST_DURATION_MS = 1500                   # How long the on-screen "BOT STARTED" / "CAVEBOT ON" message stays
+
+# ============================================
+# DEBUG CAPTURES
+# ============================================
+DEBUG_CAPTURE_DIR = "logs/debug_captures"  # Color screenshots saved on attack timeouts
+DEBUG_CAPTURE_MAX_PER_SESSION = 20         # Cap so a bad session can't fill the disk

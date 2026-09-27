@@ -25,6 +25,9 @@ from .config import (
     NAME_HEIGHT, NAME_LEFT_OFFSET, NAME_RIGHT_OFFSET,
     GRID_WIDTH, GRID_HEIGHT, PLAYER_SLOT_X, PLAYER_SLOT_Y,
     UNDER_ROOF_PIXEL_VALUE, IGNORED_PIXEL_VALUES,
+    OWN_MANA_BAR_ROWS, OWN_MANA_BAR_X_RANGE, OWN_MANA_BAR_MIN_BLUE, OWN_MANA_BAR_MAX_RED_GREEN,
+    BAR_FILL_MIN_CHROMA, BAR_LIKELY_MIN_COLOR_PIXELS,
+    OWN_BAR_CLUSTER_DX, OWN_BAR_CLUSTER_DY,
 )
 
 try:
@@ -491,6 +494,52 @@ def _is_under_roof(image: np.ndarray, bar_x: int, bar_y: int,
 # Get creatures pipeline
 # ---------------------------------------------------------------------------
 
+def is_own_character_bar(color_game_window: np.ndarray, bar_x: int, bar_y: int) -> bool:
+    """Our own HP bar has the blue mana bar directly under it."""
+    y0, y1 = bar_y + OWN_MANA_BAR_ROWS[0], bar_y + OWN_MANA_BAR_ROWS[1] + 1
+    x0, x1 = bar_x + OWN_MANA_BAR_X_RANGE[0], bar_x + OWN_MANA_BAR_X_RANGE[1]
+    if y1 > color_game_window.shape[0] or x1 > color_game_window.shape[1]:
+        return False
+    blue, green, red = color_game_window[y0:y1, x0:x1].reshape(-1, 3).mean(axis=0)
+    return blue >= OWN_MANA_BAR_MIN_BLUE and max(green, red) <= OWN_MANA_BAR_MAX_RED_GREEN
+
+
+def _drop_own_character_bars(bars, color_game_window):
+    """Remove our own HP bar plus the duplicates/mana bar the detector finds right next to it."""
+    own = [(x, y) for x, y in bars if is_own_character_bar(color_game_window, x, y)]
+
+    def near_own(bar):
+        return any(abs(bar[0] - ox) <= OWN_BAR_CLUSTER_DX
+                   and OWN_BAR_CLUSTER_DY[0] <= bar[1] - oy <= OWN_BAR_CLUSTER_DY[1]
+                   for ox, oy in own)
+
+    return [bar for bar in bars if not near_own(bar)]
+
+
+def count_bar_color_pixels(color_game_window: np.ndarray, bar_x: int, bar_y: int) -> int:
+    """Saturated pixels inside the bar box: an HP fill has them, text and terrain don't."""
+    pixels = color_game_window[bar_y:bar_y + BAR_HEIGHT, bar_x:bar_x + BAR_WIDTH].reshape(-1, 3).astype(np.int16)
+    chroma = pixels.max(axis=1) - pixels.min(axis=1)
+    return int(np.count_nonzero(chroma >= BAR_FILL_MIN_CHROMA))
+
+
+def _order_bars_for_naming(bars, color_game_window, center_x, center_y):
+    """
+    Closest first, but clearly colored bars before doubtful ones so fakes can't steal BL names.
+    Returns (ordered_bars, doubtful_bars).
+    """
+    def distance(bar):
+        return math.sqrt((bar[0] - center_x)**2 + (bar[1] - center_y)**2)
+
+    if color_game_window is None:
+        return sorted(bars, key=distance), set()
+
+    color_counts = {bar: count_bar_color_pixels(color_game_window, *bar) for bar in bars}
+    real_bars = [bar for bar in bars if color_counts[bar] > 0]
+    doubtful = {bar for bar in real_bars if color_counts[bar] < BAR_LIKELY_MIN_COLOR_PIXELS}
+    return sorted(real_bars, key=lambda bar: (bar in doubtful, distance(bar))), doubtful
+
+
 def get_creatures(battle_list_names: List[str],
                   coordinate: Tuple[int, int, int],
                   game_window_image: np.ndarray,
@@ -500,19 +549,19 @@ def get_creatures(battle_list_names: List[str],
                   logged_warnings: Set[str],
                   direction: Optional[str] = None,
                   walked_pixels: int = 0,
-                  char_atlas_manager=None) -> List[GameWindowCreature]:
+                  char_atlas_manager=None,
+                  color_game_window: Optional[np.ndarray] = None) -> List[GameWindowCreature]:
     """Full creature detection pipeline."""
     max_fallback = max(1, len(battle_list_names))
     bars = get_creatures_bars(game_window_image, max_fallback_bars=max_fallback)
+    if color_game_window is not None:
+        bars = _drop_own_character_bars(bars, color_game_window)
     if not bars:
         return []
 
     center_x = game_window_image.shape[1] / 2
     center_y = game_window_image.shape[0] / 2
-    bars_sorted = sorted(
-        bars,
-        key=lambda b: math.sqrt((b[0] - center_x)**2 + (b[1] - center_y)**2)
-    )
+    bars_sorted, doubtful_bars = _order_bars_for_naming(bars, color_game_window, center_x, center_y)
 
     available_names = Counter(battle_list_names)
     matched_counts = Counter()
@@ -527,6 +576,10 @@ def get_creatures(battle_list_names: List[str],
             total_bars, monster_templates, logged_warnings,
             char_atlas_manager
         )
+
+        # A doubtful bar nobody claimed is terrain/text, not a player
+        if name == UNIDENTIFIED_CREATURE_NAME and (bar_x, bar_y) in doubtful_bars:
+            continue
 
         creature = make_creature(
             name, ctype, method, bar_x, bar_y,

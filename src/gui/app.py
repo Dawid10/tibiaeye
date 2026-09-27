@@ -14,12 +14,19 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from .config_manager import ConfigManager
+from .profiles import (
+    ensure_profiles, list_profiles, get_active_profile, set_active_profile,
+    profile_config_path, create_profile, delete_profile,
+)
 from .tabs import BotControlTab, HealingTab, CavebotTab, TargetingTab, SpellAttackTab, StatusTab, RecorderTab, HardwareTab, DiagnosticsTab
 from .tabs.dashboard import DashboardPage
 from .components.status_bar_global import StatusBarGlobal
 from .components.sidebar import Sidebar
 from .components.status_strip import StatusStrip
 from .theme import BG_APP, BORDER
+from .global_hotkey import start_global_hotkeys
+from .components.toast import show_toast
+from ..core.constants import HOTKEY_TOGGLE_BOT, HOTKEY_TOGGLE_CAVEBOT
 
 
 # CustomTkinter appearance settings
@@ -39,8 +46,9 @@ class TibiaVisionGUI:
         # Custom colors
         self.root.configure(fg_color=BG_APP)
 
-        # Configuration
-        self.config_manager = ConfigManager()
+        # Configuration (one gui_config.json per profile)
+        ensure_profiles()
+        self.config_manager = ConfigManager(profile_config_path(get_active_profile()))
 
         # Bot state
         self.game_loop = None
@@ -62,6 +70,11 @@ class TibiaVisionGUI:
 
         # Bind close event
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self._hotkey_listener = start_global_hotkeys(self.root, {
+            HOTKEY_TOGGLE_BOT: self._toggle_bot,
+            HOTKEY_TOGGLE_CAVEBOT: self._toggle_cavebot,
+        })
 
         # Initialize realtime monitoring repositories (lazy loaded)
         self._realtime_repos = None
@@ -107,6 +120,21 @@ class TibiaVisionGUI:
         self.dashboard = DashboardPage(self._content_area)
         self._pages["dashboard"] = self.dashboard
 
+        self._create_settings_pages()
+
+        # Status
+        self.status_tab = StatusTab(self._content_area)
+        self._pages["status"] = self.status_tab
+
+        # Diagnostics
+        self.diagnostics_tab = DiagnosticsTab(self._content_area)
+        self._pages["diagnostics"] = self.diagnostics_tab
+
+        # Show initial page
+        self._navigate_to("dashboard")
+
+    def _create_settings_pages(self):
+        """Pages that read the active profile's config when built."""
         # Bot Control (Settings)
         self.bot_control_tab = BotControlTab(
             self._content_area,
@@ -115,7 +143,12 @@ class TibiaVisionGUI:
             on_stop=self._stop_bot,
             on_overlay_toggle=self._toggle_overlay,
             on_debug_overlay_toggle=self._toggle_debug_overlay,
-            config_manager=self.config_manager
+            config_manager=self.config_manager,
+            profiles=list_profiles(),
+            active_profile=get_active_profile(),
+            on_profile_switch=self._switch_profile,
+            on_profile_create=self._create_profile,
+            on_profile_delete=self._delete_profile,
         )
         self._pages["control"] = self.bot_control_tab
 
@@ -161,16 +194,66 @@ class TibiaVisionGUI:
         )
         self._pages["hardware"] = self.hardware_tab
 
-        # Status
-        self.status_tab = StatusTab(self._content_area)
-        self._pages["status"] = self.status_tab
+    def _reload_settings_pages(self):
+        """Put the active profile's settings into the existing widgets (rebuilding them is far too slow)."""
+        self.config_manager.frozen = True
+        try:
+            self.bot_control_tab.reload(self.config_manager, list_profiles(), get_active_profile())
+            for tab in (self.healing_tab, self.spell_attack_tab, self.cavebot_tab,
+                        self.targeting_tab, self.recorder_tab, self.hardware_tab):
+                tab.reload(self.config_manager)
+        finally:
+            self.config_manager.frozen = False
 
-        # Diagnostics
-        self.diagnostics_tab = DiagnosticsTab(self._content_area)
-        self._pages["diagnostics"] = self.diagnostics_tab
+    def _save_settings_pages(self):
+        """Write every widget into the profile (e.g. a new, not yet edited spell row)."""
+        self.bot_control_tab._on_module_change()
+        for tab in (self.healing_tab, self.spell_attack_tab, self.cavebot_tab,
+                    self.targeting_tab, self.recorder_tab):
+            tab._save_config()
+        self.config_manager.save()
 
-        # Show initial page
-        self._navigate_to("dashboard")
+    def _load_profile(self, name, save_current=True):
+        """Swap in a profile's config and show it in the settings pages."""
+        if save_current:
+            self._save_settings_pages()
+        set_active_profile(name)
+        self.config_manager = ConfigManager(profile_config_path(name))
+        self._reload_settings_pages()
+        self._toggle_overlay(self.config_manager.get('general.showOverlay', False))
+        self._toggle_debug_overlay(self.config_manager.get('general.showDebugOverlay', False))
+        self.bot_control_tab.log(f"Profile '{name}' loaded", "success")
+
+    def _profile_change_blocked(self):
+        if not self.running:
+            return False
+        self.bot_control_tab.profile_var.set(get_active_profile())
+        self.bot_control_tab.log("Stop the bot before changing profiles.", "warning")
+        return True
+
+    def _switch_profile(self, name):
+        if self._profile_change_blocked() or name == get_active_profile():
+            return
+        self._load_profile(name)
+
+    def _create_profile(self, name):
+        if self._profile_change_blocked():
+            return
+        self._save_settings_pages()
+        error = create_profile(name, copy_from=get_active_profile())
+        if error:
+            self.bot_control_tab.log(error, "error")
+            return
+        self._load_profile(name.strip(), save_current=False)
+
+    def _delete_profile(self, name):
+        if self._profile_change_blocked():
+            return
+        error = delete_profile(name)
+        if error:
+            self.bot_control_tab.log(error, "error")
+            return
+        self._load_profile(list_profiles()[0], save_current=False)
 
     def _toggle_theme(self):
         """Toggle between dark and light mode."""
@@ -293,6 +376,9 @@ class TibiaVisionGUI:
             context['healing']['enabled'] = general_settings.get('enableHealing', True)
             context['loot']['enabled'] = general_settings.get('enableLoot', True)
             context['loot']['hotkey'] = general_settings.get('lootHotkey', 'g')
+            context['cavebot']['chaseWithClient'] = general_settings.get('chaseWithClient', True)
+            context['cavebot']['chaseHotkey'] = general_settings.get('chaseHotkey', 'p')
+            context['cavebot']['mapClickWalking'] = general_settings.get('mapClickWalking', True)
 
             # Stuck alert
             context['cavebot']['stuckAlert'] = {
@@ -682,6 +768,29 @@ class TibiaVisionGUI:
         self.bot_control_tab.log("Bot resumed", "success")
         self.status_strip.set_status("running")
         self.status_strip.set_button_states(running=True, paused=False)
+
+    def _toggle_bot(self):
+        """Global hotkey: start when stopped, stop when running."""
+        if self.running:
+            self.bot_control_tab.set_status("stopped")
+            self._stop_bot()
+            show_toast(self.root, "BOT STOPPED", "#cc3333")
+            return
+        self._start_bot()
+        if self.running:
+            self.bot_control_tab.set_status("running")
+            show_toast(self.root, "BOT STARTED", "#00cc00")
+
+    def _toggle_cavebot(self):
+        """Global hotkey: cavebot (walking + attacking) on/off, live. Healing keeps running."""
+        enabled = not self.bot_control_tab.cavebot_var.get()
+        self.bot_control_tab.cavebot_var.set(enabled)
+        self.bot_control_tab._on_module_change()
+        if self.running and self.game_loop:
+            with self._context_lock:
+                self.game_loop.context['cavebot']['enabled'] = enabled
+        self.bot_control_tab.log(f"Cavebot {'ON' if enabled else 'OFF'}", "success" if enabled else "warning")
+        show_toast(self.root, "CAVEBOT ON" if enabled else "CAVEBOT OFF", "#00cc00" if enabled else "#cc6600")
 
     def _stop_bot(self):
         """Stop the bot gracefully."""
@@ -1114,6 +1223,7 @@ class TibiaVisionGUI:
         if self.running:
             self._stop_bot()
 
+        self._hotkey_listener.stop()
         self.overlay_controller.stop()
         if self.debug_overlay_controller:
             self.debug_overlay_controller.stop()

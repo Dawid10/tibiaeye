@@ -55,3 +55,6 @@ profile_*.py
 e2e-test-images/output/
 e2e-test-tasks/output/
 e2e/output/
+
+# Settings profiles (contain reconnect credentials)
+profiles/

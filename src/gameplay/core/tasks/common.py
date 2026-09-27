@@ -11,9 +11,13 @@ from ....core.constants import (
     WALK_COOLDOWN, WALK_TIMEOUT, WALK_STEP_TIMEOUT,
     WALK_PROGRESS_TIMEOUT, WALK_STUCK_COUNT, WALK_MAX_RECALCULATIONS,
     WALK_RETRY_SAME_DIRECTION, DEFAULT_PLAYER_SPEED, DEFAULT_TILE_FRICTION,
-    WALK_MAX_CONSECUTIVE_SKIPS,
+    WALK_MAX_CONSECUTIVE_SKIPS, WALK_PREWALK_RATIO,
+    WALK_MAP_CLICK_ENABLED, WALK_MAP_CLICK_MIN_DISTANCE, WALK_MAP_CLICK_STALL_TIMEOUT,
+    WALK_MAP_CLICK_MAX_RETRIES, MINIMAP_CLICK_MARGIN,
 )
 from ....repositories.radar.friction import TileFrictionCalculator
+from ....repositories.radar.locators import get_radar_tools_position
+from ....repositories.radar.extractors import get_minimap_pixel
 from ....utils.jitter import jitter
 
 
@@ -125,9 +129,13 @@ class WalkTask(BaseTask):
 class WalkToCoordinateTask(BaseTask):
     """Walk to coordinate with dynamic obstacle avoidance and friction-based delays."""
 
-    def __init__(self, goal: tuple):
+    def __init__(self, goal: tuple, arrive_distance: int = 0):
         super().__init__(f"WalkTo({goal})")
         self.goal = goal
+        self._arrive_distance = arrive_distance
+        self._map_walking = False
+        self._map_click_time = 0
+        self._map_retries = 0
         self.delay_of_timeout = WALK_TIMEOUT
 
         self._path = []
@@ -144,6 +152,7 @@ class WalkToCoordinateTask(BaseTask):
         self._progress_timeout = WALK_PROGRESS_TIMEOUT
         self._best_distance = float('inf')
         self._force_complete = False
+        self._wrong_floor = False
 
         self._last_obstacle_hash = None
         self._retry_same_direction = 0
@@ -170,6 +179,7 @@ class WalkToCoordinateTask(BaseTask):
         if current[2] != self.goal[2]:
             print(f"[Walk] Cannot walk to different floor {self.goal} from {current} - skipping")
             self._force_complete = True
+            self._wrong_floor = True
             return context
 
         obstacles = collect_obstacles(context)
@@ -198,11 +208,77 @@ class WalkToCoordinateTask(BaseTask):
             return context
 
         print(f"[Walk] Path to {self.goal}: {len(self._path)} steps")
+        if self._click_minimap(context, current):
+            return context
+        return self.ping(context)
+
+    def _chebyshev_to_goal(self, coord: tuple) -> int:
+        return max(abs(coord[0] - self.goal[0]), abs(coord[1] - self.goal[1]))
+
+    def _click_minimap(self, context: Context, current: tuple) -> bool:
+        """Let the client auto-walk: click the goal on the minimap. Returns True if clicked."""
+        if not context.get('cavebot', {}).get('mapClickWalking', WALK_MAP_CLICK_ENABLED):
+            return False
+        if self._chebyshev_to_goal(current) < WALK_MAP_CLICK_MIN_DISTANCE:
+            return False
+        screenshot = context.get('screenshot')
+        tools = get_radar_tools_position(screenshot) if screenshot is not None else None
+        if tools is None:
+            return False
+        pixel = get_minimap_pixel(tools, current, self.goal, MINIMAP_CLICK_MARGIN)
+        if pixel is None:
+            return False
+
+        pyautogui.click(*pixel)
+        self._map_walking = True
+        self._map_click_time = time.time()
+        self._last_pos = current
+        print(f"[Walk] Map click to {self.goal}")
+        return True
+
+    def _ping_map_walk(self, context: Context) -> Context:
+        """Watch the client auto-walk; re-click once if it stalls, then fall back to keys."""
+        current = context.get('radar', {}).get('coordinate')
+        if current is None:
+            return context
+
+        now = time.time()
+        if current != self._last_pos:
+            self._last_pos = current
+            self._map_click_time = now
+            return context
+
+        if now - self._map_click_time < WALK_MAP_CLICK_STALL_TIMEOUT:
+            return context
+
+        if self._map_retries < WALK_MAP_CLICK_MAX_RETRIES:
+            self._map_retries += 1
+            print(f"[Walk] Map walk stalled at {current} - clicking again")
+            if self._click_minimap(context, current):
+                return context
+
+        print(f"[Walk] Map walk stalled at {current} - switching to keys")
+        self._map_walking = False
+        return self._fall_back_to_keys(context, current, now)
+
+    def _fall_back_to_keys(self, context: Context, current: tuple, now: float) -> Context:
+        from ...cavebot.radar import generate_floor_walkpoints
+
+        self._path = generate_floor_walkpoints(current, self.goal, collect_obstacles(context))
+        self._path_index = 0
+        self._is_walking = False
+        self._last_progress_time = now
+        if not self._path:
+            print(f"[Walk] No path to {self.goal} - marking unreachable")
+            self._force_complete = True
         return context
 
     def ping(self, context: Context) -> Context:
         if self._force_complete:
             return context
+
+        if self._map_walking:
+            return self._ping_map_walk(context)
 
         if self._path_index >= len(self._path):
             return context
@@ -353,7 +429,7 @@ class WalkToCoordinateTask(BaseTask):
         """Try to walk toward target with friction-based cooldown."""
         if self._is_walking:
             return
-        if now - self._last_walk_time < self._walk_cooldown:
+        if now - self._last_walk_time < self._walk_cooldown * WALK_PREWALK_RATIO:
             return
 
         from ...cavebot.radar import get_direction_between_coords
@@ -388,6 +464,10 @@ class WalkToCoordinateTask(BaseTask):
         if current is None:
             return False
 
+        if self._arrive_distance and current[2] == self.goal[2]:
+            if self._chebyshev_to_goal(current) <= self._arrive_distance:
+                return True
+
         return (current[0] == self.goal[0] and
                 current[1] == self.goal[1] and
                 current[2] == self.goal[2])
@@ -395,6 +475,11 @@ class WalkToCoordinateTask(BaseTask):
     def on_complete(self, context: Context) -> Context:
         if not self._force_complete:
             context.get('cavebot', {}).pop('_skipState', None)
+            return context
+
+        if self._wrong_floor:
+            from ..waypoint import jump_back_to_current_floor
+            jump_back_to_current_floor(context)
             return context
 
         current = context.get('radar', {}).get('coordinate')

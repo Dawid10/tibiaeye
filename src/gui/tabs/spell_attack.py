@@ -168,6 +168,14 @@ class SpellAttackTab(ctk.CTkScrollableFrame):
 
     # ---- Config Persistence ----
 
+    def reload(self, config_manager):
+        """Show another profile's settings in the existing widgets."""
+        self.config_manager = config_manager
+        for frame in self._group_frames:
+            frame.destroy()
+        self._group_frames.clear()
+        self._load_config()
+
     def _load_config(self):
         """Load configuration from config manager."""
         if not self.config_manager:

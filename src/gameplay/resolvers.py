@@ -5,6 +5,8 @@ PyTibia style: each waypoint type maps to a specific task or task tree.
 """
 from typing import Any, Dict, Optional
 
+from ..core.constants import WALK_MAP_CLICK_ARRIVE_DISTANCE
+
 from .core.tasks import (
     BaseTask,
     VectorTask,
@@ -25,6 +27,18 @@ from .core.tasks import (
     DepositItemsTask,
     DropFlasksTask,
 )
+
+
+def _arrive_distance_for_walk(context: Dict[str, Any]) -> int:
+    """Pass through walk waypoints loosely; floor changes etc. need the exact tile."""
+    waypoints = context.get('cavebot', {}).get('waypoints', {})
+    items = waypoints.get('items', [])
+    if not items:
+        return 0
+    next_waypoint = items[(waypoints.get('currentIndex', 0) + 1) % len(items)]
+    if next_waypoint.get('type', 'walk') != 'walk':
+        return 0
+    return WALK_MAP_CLICK_ARRIVE_DISTANCE
 
 
 def resolve_tasks_by_waypoint(waypoint: Dict[str, Any], context: Dict[str, Any]) -> Optional[BaseTask]:
@@ -48,7 +62,7 @@ def resolve_tasks_by_waypoint(waypoint: Dict[str, Any], context: Dict[str, Any])
 
     if waypoint_type == 'walk':
         if coordinate:
-            return WalkToWaypointTask(tuple(coordinate))
+            return WalkToWaypointTask(tuple(coordinate), _arrive_distance_for_walk(context))
         return None
 
     elif waypoint_type == 'moveUp':

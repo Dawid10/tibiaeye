@@ -18,6 +18,7 @@ class ConfigManager:
     def __init__(self, config_path: str = "gui_config.json"):
         self.config_path = config_path
         self.config: Dict[str, Any] = {}
+        self.frozen = False  # While a profile is loaded into the widgets, their change handlers must not write
         self.load()
 
     def load(self) -> Dict[str, Any]:
@@ -37,6 +38,8 @@ class ConfigManager:
 
     def save(self) -> bool:
         """Save configuration to file."""
+        if self.frozen:
+            return False
         try:
             with open(self.config_path, 'w') as f:
                 json.dump(self.config, f, indent=2)
@@ -58,6 +61,8 @@ class ConfigManager:
 
     def set(self, key: str, value: Any) -> None:
         """Set a configuration value by dot-notation key."""
+        if self.frozen:
+            return
         keys = key.split('.')
         config = self.config
         for k in keys[:-1]:

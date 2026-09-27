@@ -897,6 +897,11 @@ class RecorderTab(ctk.CTkFrame):
                     pass
         self._label_counter = max_label
 
+    def reload(self, config_manager):
+        """Show another profile's settings in the existing widgets."""
+        self.config_manager = config_manager
+        self._load_config()
+
     def _load_config(self):
         """Load configuration from config manager."""
         if not self.config_manager:

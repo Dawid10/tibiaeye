@@ -9,6 +9,22 @@ import numpy as np
 from .config import dimensions
 
 
+def get_radar_bbox(radar_tools_pos: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    """Minimap (x, y, w, h): it sits to the LEFT of the radar tools (PyTibia style)."""
+    tools_x, tools_y, _, _ = radar_tools_pos
+    return (tools_x - dimensions['width'] - 11, tools_y - 50, dimensions['width'], dimensions['height'])
+
+
+def get_minimap_pixel(radar_tools_pos, current, goal, margin):
+    """Screen pixel of goal on the minimap (1 px per sqm, player at the center), or None if off the minimap."""
+    x0, y0, width, height = get_radar_bbox(radar_tools_pos)
+    px = dimensions['halfWidth'] + goal[0] - current[0]
+    py = dimensions['halfHeight'] + goal[1] - current[1]
+    if not (margin <= px < width - margin and margin <= py < height - margin):
+        return None
+    return (x0 + px, y0 + py)
+
+
 def get_radar_image(screenshot: np.ndarray, radar_tools_pos: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
     """
     Extract radar image from screenshot.
@@ -28,13 +44,9 @@ def get_radar_image(screenshot: np.ndarray, radar_tools_pos: Tuple[int, int, int
     if radar_tools_pos is None:
         return None
 
-    tools_x, tools_y, tools_w, tools_h = radar_tools_pos
-
-    # Radar is to the LEFT of tools (PyTibia style)
-    x0 = tools_x - dimensions['width'] - 11
-    x1 = x0 + dimensions['width']
-    y0 = tools_y - 50
-    y1 = y0 + dimensions['height']
+    x0, y0, width, height = get_radar_bbox(radar_tools_pos)
+    x1 = x0 + width
+    y1 = y0 + height
 
     try:
         # Bounds check

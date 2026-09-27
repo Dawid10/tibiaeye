@@ -15,8 +15,9 @@ from .vector import VectorTask
 from src.wiki.creatures import get_creature
 from .common import WalkToCoordinateTask
 from ....utils.jitter import jitter
+from ....utils.debug_capture import save_debug_screenshot
 from ....core.constants import (
-    WALK_CREATURE_TIMEOUT, CAVEBOT_ATTACK_STUCK_TIMEOUT,
+    WALK_CREATURE_TIMEOUT, CAVEBOT_ATTACK_STUCK_TIMEOUT, CHASE_WITH_CLIENT,
 )
 
 
@@ -102,21 +103,19 @@ class ClickInClosestCreatureTask(BaseTask):
 
 class WalkToTargetCreatureTask(BaseTask):
     """
-    Actively walk to target creature using A* pathfinding after Alt+Click.
+    Follow the attacked creature until it dies.
 
-    Does NOT rely on Tibia's auto-chase. Immediately starts walking toward
-    the creature using the same A* pathfinding as waypoint walking (avoids
-    walls). Re-clicks the creature every 4s as backup for missed clicks.
+    With CHASE_WITH_CLIENT the client's "Chase Opponent" mode does the walking.
+    Otherwise walks toward it with A* (avoids walls), stopping once adjacent.
+    Never re-clicks: attacking the current target again cancels the attack.
     """
 
     WALK_COOLDOWN = 0.35
-    RECLICK_INTERVAL = 4.0
 
     def __init__(self):
         super().__init__("WalkToTargetCreature")
         self.delay_of_timeout = WALK_CREATURE_TIMEOUT
         self._last_walk_time = 0
-        self._last_reclick_time = 0
         self._is_walking = False
         self._last_pos = None
         self._path = []
@@ -126,12 +125,14 @@ class WalkToTargetCreatureTask(BaseTask):
     def do(self, context: Context) -> Context:
         coord = context.get('radar', {}).get('coordinate')
         self._last_pos = coord
-        self._last_reclick_time = time.time()
         self._recalculate_path(context)
         return context
 
     def _get_gw_creature(self, context: Context):
-        """Get GameWindowCreature with coordinate (closestCreature from GW middleware)."""
+        """The creature we are attacking (red square); closest monster only as fallback."""
+        for monster in context.get('gameWindow', {}).get('monsters', []):
+            if getattr(monster, 'is_being_attacked', False) and hasattr(monster, 'coordinate'):
+                return monster
         closest = context.get('cavebot', {}).get('closestCreature')
         if closest is not None and hasattr(closest, 'coordinate'):
             return closest
@@ -169,19 +170,11 @@ class WalkToTargetCreatureTask(BaseTask):
         if coord is None:
             return context
 
+        if context.get('cavebot', {}).get('chaseWithClient', CHASE_WITH_CLIENT):
+            return context
+
         target = self._get_gw_creature(context)
         now = time.time()
-
-        # Re-click creature periodically (backup for missed clicks)
-        if target is not None and now - self._last_reclick_time > self.RECLICK_INTERVAL:
-            if hasattr(target, 'window_coordinate'):
-                x, y = target.window_coordinate
-                pyautogui.keyDown('alt')
-                pyautogui.click(x, y)
-                pyautogui.keyUp('alt')
-                self._last_reclick_time = now
-                print(f"[Walk] Re-click {target.name} at ({x}, {y})")
-
         if target is None:
             return context
 
@@ -192,7 +185,8 @@ class WalkToTargetCreatureTask(BaseTask):
         self._last_pos = coord
 
         target_coord = target.coordinate
-        if target_coord[0] == coord[0] and target_coord[1] == coord[1]:
+        # Already in melee range (diagonal counts) - stepping would only dance around it
+        if max(abs(target_coord[0] - coord[0]), abs(target_coord[1] - coord[1])) <= 1:
             return context
 
         # Recalculate path when target moved or path exhausted
@@ -418,6 +412,7 @@ class AttackClosestCreatureTask(VectorTask):
             cavebot['targetCreature'] = None
             cavebot['isAttackingSomeCreature'] = False
 
+        save_debug_screenshot(context, "attack_timeout")
         pyautogui.press('escape')
         print("[Attack] Timeout — target cleared + blacklisted")
 
@@ -519,9 +514,9 @@ class SetNextWaypointTask(BaseTask):
 class WalkToWaypointTask(VectorTask):
     """Walk to a waypoint coordinate."""
 
-    def __init__(self, coordinate: tuple):
+    def __init__(self, coordinate: tuple, arrive_distance: int = 0):
         super().__init__(f"WalkToWaypoint({coordinate})")
-        self.add_task(WalkToCoordinateTask(coordinate))
+        self.add_task(WalkToCoordinateTask(coordinate, arrive_distance))
         self.add_task(SetNextWaypointTask())
 
 
