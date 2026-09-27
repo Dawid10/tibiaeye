@@ -1,0 +1,1053 @@
+{
+  "name": "stonerefiners_venore",
+  "waypoints": [
+    {
+      "id": 0,
+      "type": "walk",
+      "coordinate": [
+        33044,
+        32003,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 1,
+      "type": "walk",
+      "coordinate": [
+        33048,
+        32002,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 2,
+      "type": "walk",
+      "coordinate": [
+        33052,
+        32001,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 3,
+      "type": "walk",
+      "coordinate": [
+        33056,
+        32000,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 4,
+      "type": "walk",
+      "coordinate": [
+        33059,
+        31998,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 5,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        31996,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 6,
+      "type": "walk",
+      "coordinate": [
+        33065,
+        31995,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 7,
+      "type": "walk",
+      "coordinate": [
+        33068,
+        31993,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 8,
+      "type": "walk",
+      "coordinate": [
+        33069,
+        31991,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 9,
+      "type": "walk",
+      "coordinate": [
+        33070,
+        31990,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 10,
+      "type": "walk",
+      "coordinate": [
+        33071,
+        31986,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 11,
+      "type": "walk",
+      "coordinate": [
+        33070,
+        31983,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 12,
+      "type": "walk",
+      "coordinate": [
+        33069,
+        31980,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 13,
+      "type": "walk",
+      "coordinate": [
+        33066,
+        31979,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 14,
+      "type": "walk",
+      "coordinate": [
+        33064,
+        31979,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 15,
+      "type": "walk",
+      "coordinate": [
+        33061,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 16,
+      "type": "walk",
+      "coordinate": [
+        33059,
+        31978,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 17,
+      "type": "walk",
+      "coordinate": [
+        33053,
+        31978,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 18,
+      "type": "walk",
+      "coordinate": [
+        33050,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 19,
+      "type": "walk",
+      "coordinate": [
+        33045,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 20,
+      "type": "walk",
+      "coordinate": [
+        33040,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 21,
+      "type": "walk",
+      "coordinate": [
+        33039,
+        31978,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 22,
+      "type": "walk",
+      "coordinate": [
+        33036,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 23,
+      "type": "walk",
+      "coordinate": [
+        33041,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 24,
+      "type": "walk",
+      "coordinate": [
+        33047,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 25,
+      "type": "walk",
+      "coordinate": [
+        33052,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 26,
+      "type": "walk",
+      "coordinate": [
+        33058,
+        31977,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 27,
+      "type": "walk",
+      "coordinate": [
+        33063,
+        31978,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 28,
+      "type": "walk",
+      "coordinate": [
+        33067,
+        31979,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 29,
+      "type": "walk",
+      "coordinate": [
+        33069,
+        31981,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 30,
+      "type": "walk",
+      "coordinate": [
+        33071,
+        31984,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 31,
+      "type": "walk",
+      "coordinate": [
+        33071,
+        31987,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 32,
+      "type": "walk",
+      "coordinate": [
+        33069,
+        31990,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 33,
+      "type": "walk",
+      "coordinate": [
+        33067,
+        31994,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 34,
+      "type": "walk",
+      "coordinate": [
+        33066,
+        31997,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 35,
+      "type": "walk",
+      "coordinate": [
+        33064,
+        32000,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 36,
+      "type": "walk",
+      "coordinate": [
+        33064,
+        32006,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 37,
+      "type": "walk",
+      "coordinate": [
+        33060,
+        32009,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 38,
+      "type": "walk",
+      "coordinate": [
+        33059,
+        32015,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 39,
+      "type": "walk",
+      "coordinate": [
+        33056,
+        32018,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 40,
+      "type": "walk",
+      "coordinate": [
+        33052,
+        32019,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 41,
+      "type": "walk",
+      "coordinate": [
+        33047,
+        32020,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 42,
+      "type": "walk",
+      "coordinate": [
+        33042,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 43,
+      "type": "walk",
+      "coordinate": [
+        33037,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 44,
+      "type": "walk",
+      "coordinate": [
+        33052,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 45,
+      "type": "walk",
+      "coordinate": [
+        33052,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 46,
+      "type": "walk",
+      "coordinate": [
+        33052,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 47,
+      "type": "walk",
+      "coordinate": [
+        33063,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 48,
+      "type": "walk",
+      "coordinate": [
+        33065,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 49,
+      "type": "walk",
+      "coordinate": [
+        33072,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 50,
+      "type": "walk",
+      "coordinate": [
+        33076,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 51,
+      "type": "walk",
+      "coordinate": [
+        33071,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 52,
+      "type": "walk",
+      "coordinate": [
+        33069,
+        32021,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 53,
+      "type": "walk",
+      "coordinate": [
+        33065,
+        32027,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 54,
+      "type": "walk",
+      "coordinate": [
+        33064,
+        32033,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 55,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32037,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 56,
+      "type": "walk",
+      "coordinate": [
+        33055,
+        32037,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 57,
+      "type": "walk",
+      "coordinate": [
+        33052,
+        32038,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 58,
+      "type": "walk",
+      "coordinate": [
+        33047,
+        32038,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 59,
+      "type": "walk",
+      "coordinate": [
+        33043,
+        32040,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 60,
+      "type": "walk",
+      "coordinate": [
+        33038,
+        32040,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 61,
+      "type": "walk",
+      "coordinate": [
+        33038,
+        32040,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 62,
+      "type": "walk",
+      "coordinate": [
+        33043,
+        32040,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 63,
+      "type": "walk",
+      "coordinate": [
+        33043,
+        32041,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 64,
+      "type": "walk",
+      "coordinate": [
+        33050,
+        32041,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 65,
+      "type": "walk",
+      "coordinate": [
+        33057,
+        32041,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 66,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32043,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 67,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32048,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 68,
+      "type": "walk",
+      "coordinate": [
+        33061,
+        32052,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 69,
+      "type": "walk",
+      "coordinate": [
+        33057,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 70,
+      "type": "walk",
+      "coordinate": [
+        33054,
+        32055,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 71,
+      "type": "walk",
+      "coordinate": [
+        33050,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 72,
+      "type": "walk",
+      "coordinate": [
+        33044,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 73,
+      "type": "walk",
+      "coordinate": [
+        33040,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 74,
+      "type": "walk",
+      "coordinate": [
+        33035,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 75,
+      "type": "walk",
+      "coordinate": [
+        33039,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 76,
+      "type": "walk",
+      "coordinate": [
+        33042,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 77,
+      "type": "walk",
+      "coordinate": [
+        33048,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 78,
+      "type": "walk",
+      "coordinate": [
+        33051,
+        32055,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 79,
+      "type": "walk",
+      "coordinate": [
+        33055,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 80,
+      "type": "walk",
+      "coordinate": [
+        33061,
+        32054,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 81,
+      "type": "walk",
+      "coordinate": [
+        33063,
+        32053,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 82,
+      "type": "walk",
+      "coordinate": [
+        33063,
+        32048,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 83,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32045,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 84,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32038,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 85,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32033,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 86,
+      "type": "walk",
+      "coordinate": [
+        33063,
+        32028,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 87,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32023,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 88,
+      "type": "walk",
+      "coordinate": [
+        33062,
+        32020,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 89,
+      "type": "walk",
+      "coordinate": [
+        33061,
+        32017,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 90,
+      "type": "walk",
+      "coordinate": [
+        33061,
+        32012,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 91,
+      "type": "walk",
+      "coordinate": [
+        33056,
+        32006,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 92,
+      "type": "walk",
+      "coordinate": [
+        33054,
+        32006,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 93,
+      "type": "walk",
+      "coordinate": [
+        33050,
+        32005,
+        13
+      ],
+      "label": "",
+      "options": {}
+    },
+    {
+      "id": 94,
+      "type": "walk",
+      "coordinate": [
+        33045,
+        32005,
+        13
+      ],
+      "label": "",
+      "options": {}
+    }
+  ],
+  "metadata": {
+    "recorded_at": "2026-09-27 12:20:20"
+  }
+}

@@ -26,6 +26,11 @@ def _get_screen_offset() -> Tuple[int, int]:
     return _cached_offset
 
 
+def get_screen_offset() -> Tuple[int, int]:
+    """Top-left of the captured region on screen (screenshot pixel + offset = screen pixel)."""
+    return _cached_offset
+
+
 def refresh_screen_offset() -> None:
     """Re-read capture region offset from ScreenCapture. Call after refresh_capture_region()."""
     global _cached_offset

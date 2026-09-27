@@ -14,6 +14,7 @@ from ...core.constants import (
     CONFIDENCE_UI_DEFAULT, CONFIDENCE_UI_BUTTON, CONFIDENCE_DEPOT,
     CONFIDENCE_ARROW_HIGH, CONFIDENCE_ARROW_MED, CONFIDENCE_ARROW_LOW,
 )
+from ..utils.cached_position import is_template_at
 from .config import (
     IMAGES_PATH, load_gray_image,
     MAP_TOP_DEFAULT_OFFSET, MAP_TOP_SEARCH_ROWS, MAP_FRAME_DARK_MAX, MAP_FRAME_UNIFORM_MAX_STD,
@@ -36,14 +37,18 @@ def locate(img: np.ndarray, template: np.ndarray,
     return None
 
 
+def _cached_arrow_still_there(screenshot: np.ndarray, arrow_images: dict, cache: dict) -> bool:
+    template = arrow_images.get(cache.get('arrow'))
+    if cache.get('position') is None or template is None:
+        return False
+    return is_template_at(screenshot, template, cache['position'], CONFIDENCE_ARROW_LOW)
+
+
 def find_left_arrow(screenshot: np.ndarray, arrow_images: dict,
                     cache: dict) -> Optional[Tuple[int, int, int, int]]:
-    if cache.get('position') is not None:
-        pos = cache['position']
-        x, y, w, h = pos
-        if y + h <= screenshot.shape[0] and x + w <= screenshot.shape[1]:
-            return pos
-        cache['position'] = None
+    if _cached_arrow_still_there(screenshot, arrow_images, cache):
+        return cache['position']
+    cache['position'] = None
 
     for conf in [CONFIDENCE_ARROW_HIGH, CONFIDENCE_ARROW_MED, CONFIDENCE_ARROW_LOW]:
         for name in ['leftGameWindow01', 'leftGameWindow11', 'leftGameWindow10', 'leftGameWindow00']:
@@ -62,12 +67,9 @@ def find_left_arrow(screenshot: np.ndarray, arrow_images: dict,
 
 def find_right_arrow(screenshot: np.ndarray, arrow_images: dict,
                      cache: dict) -> Optional[Tuple[int, int, int, int]]:
-    if cache.get('position') is not None:
-        pos = cache['position']
-        x, y, w, h = pos
-        if y + h <= screenshot.shape[0] and x + w <= screenshot.shape[1]:
-            return pos
-        cache['position'] = None
+    if _cached_arrow_still_there(screenshot, arrow_images, cache):
+        return cache['position']
+    cache['position'] = None
 
     for conf in [CONFIDENCE_ARROW_HIGH, CONFIDENCE_ARROW_MED, CONFIDENCE_ARROW_LOW]:
         for name in ['rightGameWindow01', 'rightGameWindow11', 'rightGameWindow10', 'rightGameWindow00']:

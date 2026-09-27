@@ -5,6 +5,8 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
+from ..utils.cached_position import is_template_at
+
 from .config import images, hashit
 from ...core.constants import CONFIDENCE_UI_DEFAULT
 
@@ -39,21 +41,15 @@ def get_skills_icon_position(screenshot: np.ndarray) -> Optional[Tuple[int, int,
     """
     global _skills_icon_cache
 
-    # OPTIMIZATION: If we have a cached position, use it directly!
-    # The icon position doesn't change, so no need to verify with hash every tick.
-    if _skills_icon_cache['position'] is not None:
-        pos = _skills_icon_cache['position']
-        # Only verify bounds (very fast check)
-        if (pos[1] + pos[3] <= screenshot.shape[0] and
-            pos[0] + pos[2] <= screenshot.shape[1]):
-            return _skills_icon_cache['position']
-        # Bounds failed = screen changed, clear cache
-        _skills_icon_cache['position'] = None
-
-    # Find skills icon (only happens once per session)
     skills_icon = images['icons'].get('skills')
     if skills_icon is None:
         return None
+
+    # Cached spot is re-checked with one tiny match (capture mode or window may have moved)
+    if _skills_icon_cache['position'] is not None:
+        if is_template_at(screenshot, skills_icon, _skills_icon_cache['position']):
+            return _skills_icon_cache['position']
+        _skills_icon_cache['position'] = None
 
     position = locate(screenshot, skills_icon)
     if position is not None:

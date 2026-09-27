@@ -9,6 +9,7 @@ import numpy as np
 
 from . import config as _cfg
 from .config import dimensions
+from ..utils.cached_position import is_template_at
 from ...core.constants import CONFIDENCE_UI_DEFAULT
 
 
@@ -31,15 +32,17 @@ def get_radar_tools_position(screenshot: np.ndarray, use_cache: bool = True) -> 
     """
     global _radar_tools_pos_cache
 
-    # Return cached position if available
-    if use_cache and _radar_tools_pos_cache is not None:
-        return _radar_tools_pos_cache
-
     _cfg._ensure_loaded()
 
     template = _cfg.images.get('tools')
     if template is None:
         return None
+
+    # Cached spot is re-checked with one tiny match (capture mode or window may have moved)
+    if use_cache and _radar_tools_pos_cache is not None:
+        if is_template_at(screenshot, template, _radar_tools_pos_cache):
+            return _radar_tools_pos_cache
+        _radar_tools_pos_cache = None
 
     # Template matching
     try:

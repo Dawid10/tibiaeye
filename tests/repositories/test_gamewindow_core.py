@@ -972,23 +972,39 @@ class TestCaptureGameWindow:
 
 class TestArrowDetection:
 
+    @staticmethod
+    def _screen_with_arrow(x, y):
+        """Screenshot with a textured 5x5 'arrow' at (x, y) and the matching template."""
+        arrow = np.arange(25, dtype=np.uint8).reshape(5, 5) * 10
+        screenshot = np.zeros((100, 100), dtype=np.uint8)
+        screenshot[y:y + 5, x:x + 5] = arrow
+        return screenshot, {'test': arrow}
+
     def test_find_left_arrow_cache_hit(self):
+        """Cached position is reused when the arrow is still there."""
+        screenshot, arrows = self._screen_with_arrow(10, 20)
         cache = {'position': (10, 20, 5, 5), 'arrow': 'test'}
-        screenshot = np.ones((100, 100), dtype=np.uint8)
-        result = find_left_arrow(screenshot, {}, cache)
-        assert result == (10, 20, 5, 5)
+        assert find_left_arrow(screenshot, arrows, cache) == (10, 20, 5, 5)
 
     def test_find_left_arrow_cache_invalidated_by_bounds(self):
+        """A cached position outside the screenshot is dropped."""
+        screenshot, arrows = self._screen_with_arrow(10, 20)
         cache = {'position': (10, 95, 5, 10), 'arrow': 'test'}
-        screenshot = np.ones((100, 100), dtype=np.uint8)
-        result = find_left_arrow(screenshot, {}, cache)
+        find_left_arrow(screenshot, {}, cache)
+        assert cache['position'] is None
+
+    def test_find_left_arrow_cache_invalidated_when_arrow_moved(self):
+        """Window vs full-screen capture shifts the UI: a stale position is dropped."""
+        screenshot, arrows = self._screen_with_arrow(10, 50)
+        cache = {'position': (10, 20, 5, 5), 'arrow': 'test'}
+        find_left_arrow(screenshot, {}, cache)
         assert cache['position'] is None
 
     def test_find_right_arrow_cache_hit(self):
+        """Cached position is reused when the arrow is still there."""
+        screenshot, arrows = self._screen_with_arrow(50, 20)
         cache = {'position': (50, 20, 5, 5), 'arrow': 'test'}
-        screenshot = np.ones((100, 100), dtype=np.uint8)
-        result = find_right_arrow(screenshot, {}, cache)
-        assert result == (50, 20, 5, 5)
+        assert find_right_arrow(screenshot, arrows, cache) == (50, 20, 5, 5)
 
     def test_get_game_window_position_no_arrows(self):
         screenshot = np.ones((100, 100), dtype=np.uint8)

@@ -8,10 +8,11 @@ from ...repositories.statusbar.config import BAR_SIZE
 from ...repositories.skills.locators import get_skills_icon_position
 from ...repositories.battlelist.locators import get_icon_position as bl_get_icon_position
 from ...repositories.battlelist.config import load_icon_image, CONTENT_WIDTH
-from ...repositories.gamewindow.core import find_left_arrow, find_right_arrow
+from ...repositories.gamewindow.core import get_game_window_position
 from ...repositories.gamewindow.config import load_arrow_images
 from ...repositories.radar.locators import get_radar_tools_position
 from ...repositories.radar.extractors import get_radar_bbox
+from ...repositories.utils.cached_position import is_template_at
 from ...repositories.actionBar.core import ActionBarRepository, _locate as ab_locate
 
 # BattleList uses its own cache dict (locator takes cache as param)
@@ -21,6 +22,7 @@ _bl_icon_image = None
 # GameWindow arrow caches
 _gw_left_cache: Dict[str, object] = {}
 _gw_right_cache: Dict[str, object] = {}
+_gw_map_top_cache: Dict[str, object] = {}
 _gw_arrow_images = None
 
 # ActionBar cache
@@ -95,17 +97,13 @@ def get_overlay_regions(screenshot_gray: np.ndarray) -> List[Dict]:
                 'bbox': (content_x, content_y, CONTENT_WIDTH + 2, 220 + h),
             })
 
-    # Game Window region: area between left and right arrows
+    # Game Window region: the map itself, same position the bot clicks with
     arrow_images = _get_gw_arrow_images()
     if arrow_images:
-        left_pos = find_left_arrow(screenshot_gray, arrow_images, _gw_left_cache)
-        right_pos = find_right_arrow(screenshot_gray, arrow_images, _gw_right_cache)
-        if left_pos is not None and right_pos is not None:
-            gw_x = left_pos[0] + left_pos[2]
-            gw_y = left_pos[1]
-            gw_w = right_pos[0] - gw_x
-            gw_h = left_pos[3]
-            regions.append({'name': 'Game Window', 'bbox': (gw_x, gw_y, gw_w, gw_h)})
+        game_window = get_game_window_position(
+            screenshot_gray, arrow_images, _gw_left_cache, _gw_right_cache, _gw_map_top_cache)
+        if game_window is not None:
+            regions.append({'name': 'Game Window', 'bbox': game_window})
 
     # Radar/Minimap region: derived from tools position
     radar_pos = get_radar_tools_position(screenshot_gray)
@@ -116,6 +114,8 @@ def get_overlay_regions(screenshot_gray: np.ndarray) -> List[Dict]:
     _init_actionbar()
     global _ab_left_arrows_pos
     if _ab_left_arrows is not None:
+        if _ab_left_arrows_pos is not None and not is_template_at(screenshot_gray, _ab_left_arrows, _ab_left_arrows_pos):
+            _ab_left_arrows_pos = None
         if _ab_left_arrows_pos is None:
             _ab_left_arrows_pos = ab_locate(screenshot_gray, _ab_left_arrows)
         if _ab_left_arrows_pos is not None:

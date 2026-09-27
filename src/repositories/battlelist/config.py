@@ -132,7 +132,8 @@ def load_learned_hashes(name_hashes: Dict[int, str],
 
 
 def save_learned_hash(hash_value: int, name: str,
-                      path: pathlib.Path = LEARNED_HASHES_PATH) -> None:
+                      path: pathlib.Path = LEARNED_HASHES_PATH,
+                      overwrite: bool = False) -> None:
     """Save a learned hash to the JSON file."""
     try:
         learned = {}
@@ -141,7 +142,7 @@ def save_learned_hash(hash_value: int, name: str,
                 learned = json.load(f)
 
         hash_str = str(hash_value)
-        if hash_str in learned:
+        if hash_str in learned and not overwrite:
             return
 
         learned[hash_str] = name

@@ -5,6 +5,7 @@ PyTibia style: loads floor images, walkable matrices, and floor level indicators
 Heavy data (images, walkable matrices) is lazy-loaded on first use via _ensure_loaded().
 """
 import pathlib
+import threading
 import numpy as np
 import cv2
 
@@ -126,15 +127,24 @@ floorsPathsSqms = None
 images = None
 
 _loaded = False
+# Loading takes ~3s; the bot loop, the GUI status panel and the recorder can all call it at once.
+# Without the lock a second caller restarts the load mid-way and it never finishes (IndexError forever).
+_load_lock = threading.Lock()
 
 
 def _ensure_loaded():
-    """Load heavy data (floor images, walkable matrices) on first call."""
-    global _loaded, floorsImgs, floorsPathsImgs, floorsLevelsImgs
-    global floorsLevelsImgsHashes, walkableFloorsSqms, floorsPathsSqms, images
-
+    """Load heavy data (floor images, walkable matrices) on first call. Thread-safe."""
     if _loaded:
         return
+    with _load_lock:
+        if _loaded:
+            return
+        _load()
+
+
+def _load():
+    global _loaded, floorsImgs, floorsPathsImgs, floorsLevelsImgs
+    global floorsLevelsImgsHashes, walkableFloorsSqms, floorsPathsSqms, images
 
     print("Loading radar data...")
 

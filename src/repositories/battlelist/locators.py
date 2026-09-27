@@ -5,6 +5,7 @@ import cv2
 
 from .typings import BBox, GrayImage
 from ...core.constants import CONFIDENCE_UI_DEFAULT
+from ..utils.cached_position import is_template_at
 
 
 def locate(screenshot: GrayImage, template: GrayImage,
@@ -33,8 +34,7 @@ def get_icon_position(screenshot: GrayImage,
 
     cached_pos = cache.get('icon_pos')
     if cached_pos is not None:
-        x, y, w, h = cached_pos
-        if y + h <= screenshot.shape[0] and x + w <= screenshot.shape[1]:
+        if is_template_at(screenshot, icon_image, cached_pos, confidence):
             return cached_pos
         cache['icon_pos'] = None
 

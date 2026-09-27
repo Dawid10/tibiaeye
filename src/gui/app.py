@@ -476,6 +476,7 @@ class TibiaVisionGUI:
                 'enabled': spell_attack_settings.get('enabled', False),
                 'manaReservePercent': spell_attack_settings.get('manaReservePercent', 30),
                 'groups': spell_attack_settings.get('groups', []),
+                'mantra': spell_attack_settings.get('mantra', {}),
                 'lastCastSpell': None,
                 'lastCastTime': 0,
             }
@@ -578,6 +579,7 @@ class TibiaVisionGUI:
                         sa['enabled'] = sa_settings.get('enabled', False)
                         sa['manaReservePercent'] = sa_settings.get('manaReservePercent', 30)
                         sa['groups'] = sa_settings.get('groups', [])
+                        sa['mantra'] = sa_settings.get('mantra', {})
 
                         # Update targeting settings
                         self.game_loop.context['targeting'] = {

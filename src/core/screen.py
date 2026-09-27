@@ -5,6 +5,7 @@ Uses MSS for fast screen capture with optional caching to avoid
 redundant image processing when the screen hasn't changed.
 """
 import hashlib
+import threading
 import time
 from dataclasses import dataclass, field
 from functools import wraps
@@ -95,7 +96,10 @@ class ScreenCapture:
         if self._initialized:
             return
 
-        self._sct = mss.mss() if MSS_AVAILABLE else None
+        # mss handles and image buffers are per thread: the bot loop, the GUI status panel and the
+        # recorder capture concurrently. A shared mss deadlocked, and a shared buffer let one thread
+        # overwrite the screenshot another was still reading.
+        self._local = threading.local()
         self._last_frame: Optional[np.ndarray] = None
         self._last_frame_time: float = 0
         self._frame_cache_ttl: float = 0.016  # ~60fps max
@@ -103,9 +107,31 @@ class ScreenCapture:
         self._window_id: Optional[int] = None
         self._capture_backend_name: Optional[str] = None
         self._capture_backend_func: Optional[Callable] = None
-        self._buf_bgr: Optional[np.ndarray] = None
-        self._buf_gray: Optional[np.ndarray] = None
         self._initialized = True
+
+    @property
+    def _sct(self):
+        sct = getattr(self._local, 'sct', None)
+        if sct is None and MSS_AVAILABLE:
+            sct = mss.mss()
+            self._local.sct = sct
+        return sct
+
+    @property
+    def _buf_bgr(self) -> Optional[np.ndarray]:
+        return getattr(self._local, 'buf_bgr', None)
+
+    @_buf_bgr.setter
+    def _buf_bgr(self, value: Optional[np.ndarray]) -> None:
+        self._local.buf_bgr = value
+
+    @property
+    def _buf_gray(self) -> Optional[np.ndarray]:
+        return getattr(self._local, 'buf_gray', None)
+
+    @_buf_gray.setter
+    def _buf_gray(self, value: Optional[np.ndarray]) -> None:
+        self._local.buf_gray = value
 
     def set_capture_region(self, region: Optional['Region']) -> None:
         """Set fixed capture region (e.g. Tibia window). None for full screen."""

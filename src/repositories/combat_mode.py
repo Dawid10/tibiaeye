@@ -6,6 +6,7 @@ import numpy as np
 from ..core.constants import (
     CHASE_BUTTON_OFFSET_FROM_RADAR_TOOLS, CHASE_BUTTON_BOX,
     CHASE_BUTTON_MIN_GREEN_PIXELS, CHASE_BUTTON_GREEN_MARGIN,
+    MANTRA_PIXEL_BOX, MANTRA_PIXEL_MIN_MATCHES,
 )
 
 
@@ -22,6 +23,17 @@ def count_chase_button_green(screenshot_bgr: np.ndarray,
     blue, green, red = pixels[:, 0], pixels[:, 1], pixels[:, 2]
     is_green = (green > red + CHASE_BUTTON_GREEN_MARGIN) & (green > blue + CHASE_BUTTON_GREEN_MARGIN)
     return int(np.count_nonzero(is_green))
+
+
+def is_pixel_lit(screenshot_bgr: np.ndarray, x: int, y: int, rgb, tolerance: int) -> bool:
+    """True when enough pixels around (x, y) are within tolerance of rgb on every channel."""
+    half = MANTRA_PIXEL_BOX // 2
+    box = screenshot_bgr[max(0, y - half):y + half + 1, max(0, x - half):x + half + 1]
+    if box.size == 0:
+        return False
+    pixels = box.reshape(-1, 3).astype(np.int16)[:, ::-1]  # BGR -> RGB
+    close = np.all(np.abs(pixels - np.array(rgb, dtype=np.int16)) <= tolerance, axis=1)
+    return int(np.count_nonzero(close)) >= MANTRA_PIXEL_MIN_MATCHES
 
 
 def is_chase_mode_on(green_pixels: int) -> bool:

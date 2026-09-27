@@ -84,6 +84,8 @@ class SpellAttackTab(ctk.CTkScrollableFrame):
         self.reserve_slider.pack(side="left", padx=10, fill="x", expand=True)
         Tooltip(self.reserve_slider, "Porcentagem minima de mana que o bot reserva antes de usar spell de ataque. Garante mana para healing.")
 
+        self._setup_mantra_section()
+
         # Groups container
         self._groups_container = ctk.CTkFrame(self, fg_color="transparent")
         self._groups_container.pack(fill="x", padx=5, pady=5)
@@ -95,6 +97,98 @@ class SpellAttackTab(ctk.CTkScrollableFrame):
             command=self._add_group,
             style="accent",
         ).pack(pady=10)
+
+    def _setup_mantra_section(self):
+        section = create_section(self, "Mantra (Monk)")
+        section.pack(fill="x", padx=5, pady=5)
+        content = ctk.CTkFrame(section, fg_color="transparent")
+        content.pack(fill="x", padx=10, pady=10)
+
+        self.mantra_enabled_var = ctk.BooleanVar(value=False)
+        mantra_box = create_checkbox(
+            content, text="Enable Mantra", variable=self.mantra_enabled_var, command=self._save_config,
+        )
+        mantra_box.pack(anchor="w")
+        Tooltip(mantra_box, "While monsters are on the battle list, press the hotkey whenever the mantra indicator "
+                            "pixel shows its colour. Runs before attack spells, even if Spell Attack is off.")
+
+        self.mantra_hotkey_var = ctk.StringVar(value="f9")
+        self.mantra_cooldown_var = ctk.StringVar(value="2.0")
+        self.mantra_x_var = ctk.StringVar(value="1003")
+        self.mantra_y_var = ctk.StringVar(value="107")
+        self.mantra_tolerance_var = ctk.StringVar(value="50")
+        self._mantra_color = [216, 150, 74]
+
+        row1 = ctk.CTkFrame(content, fg_color="transparent")
+        row1.pack(fill="x", pady=(8, 0))
+        for label, var, width in (("Hotkey:", self.mantra_hotkey_var, 50), ("Cooldown (s):", self.mantra_cooldown_var, 50)):
+            ctk.CTkLabel(row1, text=label).pack(side="left", padx=(0, 4))
+            create_entry(row1, textvariable=var, width=width).pack(side="left", padx=(0, 12))
+
+        row2 = ctk.CTkFrame(content, fg_color="transparent")
+        row2.pack(fill="x", pady=(8, 0))
+        for label, var in (("Pixel X:", self.mantra_x_var), ("Y:", self.mantra_y_var), ("Tolerance:", self.mantra_tolerance_var)):
+            ctk.CTkLabel(row2, text=label).pack(side="left", padx=(0, 4))
+            create_entry(row2, textvariable=var, width=60).pack(side="left", padx=(0, 12))
+
+        row3 = ctk.CTkFrame(content, fg_color="transparent")
+        row3.pack(fill="x", pady=(8, 0))
+        ctk.CTkLabel(row3, text="Colour:").pack(side="left", padx=(0, 4))
+        self.mantra_swatch = ctk.CTkLabel(row3, text="", width=24, height=18, corner_radius=4)
+        self.mantra_swatch.pack(side="left", padx=(0, 6))
+        self.mantra_color_label = ctk.CTkLabel(row3, text="", text_color=TEXT_MUTED)
+        self.mantra_color_label.pack(side="left", padx=(0, 12))
+        read_button = create_button(row3, "Read pixel now", self._read_mantra_pixel, style="default", width=120)
+        read_button.pack(side="left")
+        Tooltip(read_button, "With the mantra indicator LIT in game, sample the colour at Pixel X/Y (screen coordinates).")
+        self._show_mantra_color()
+
+        for var in (self.mantra_hotkey_var, self.mantra_cooldown_var, self.mantra_x_var,
+                    self.mantra_y_var, self.mantra_tolerance_var):
+            var.trace_add("write", lambda *args: self._save_config())
+
+    def _show_mantra_color(self):
+        red, green, blue = self._mantra_color
+        self.mantra_swatch.configure(fg_color=f"#{red:02x}{green:02x}{blue:02x}")
+        self.mantra_color_label.configure(text=f"({red}, {green}, {blue})")
+
+    def _read_mantra_pixel(self):
+        import mss
+        try:
+            x, y = int(self.mantra_x_var.get()), int(self.mantra_y_var.get())
+        except ValueError:
+            return
+        with mss.mss() as screen:
+            pixel = screen.grab({'left': x, 'top': y, 'width': 1, 'height': 1}).pixel(0, 0)
+        self._mantra_color = [int(channel) for channel in pixel[:3]]
+        self._show_mantra_color()
+        self._save_config()
+
+    def _get_mantra_settings(self) -> Dict[str, Any]:
+        def number(var, cast, default):
+            try:
+                return cast(var.get())
+            except ValueError:
+                return default
+        return {
+            'enabled': self.mantra_enabled_var.get(),
+            'hotkey': self.mantra_hotkey_var.get().strip(),
+            'pixelX': number(self.mantra_x_var, int, 1003),
+            'pixelY': number(self.mantra_y_var, int, 107),
+            'pixelColor': list(self._mantra_color),
+            'tolerance': number(self.mantra_tolerance_var, int, 50),
+            'cooldown': number(self.mantra_cooldown_var, float, 2.0),
+        }
+
+    def _load_mantra(self, mantra):
+        self.mantra_enabled_var.set(mantra.get('enabled', False))
+        self.mantra_hotkey_var.set(mantra.get('hotkey', 'f9'))
+        self.mantra_cooldown_var.set(str(mantra.get('cooldown', 2.0)))
+        self.mantra_x_var.set(str(mantra.get('pixelX', 1003)))
+        self.mantra_y_var.set(str(mantra.get('pixelY', 107)))
+        self.mantra_tolerance_var.set(str(mantra.get('tolerance', 50)))
+        self._mantra_color = list(mantra.get('pixelColor', [216, 150, 74]))
+        self._show_mantra_color()
 
     def _on_reserve_change(self, value):
         """Update reserve label and save."""
@@ -190,6 +284,9 @@ class SpellAttackTab(ctk.CTkScrollableFrame):
         for group_data in config.get('groups', []):
             self._add_group(group_data)
 
+        # After the groups: setting these fires _save_config, which must see every group
+        self._load_mantra(config.get('mantra', {}))
+
     def _save_config(self):
         """Save current configuration."""
         if not self.config_manager:
@@ -204,6 +301,7 @@ class SpellAttackTab(ctk.CTkScrollableFrame):
             'enabled': self.enabled_var.get(),
             'manaReservePercent': self.reserve_var.get(),
             'groups': [f.get_data() for f in self._group_frames],
+            'mantra': self._get_mantra_settings(),
         }
 
 

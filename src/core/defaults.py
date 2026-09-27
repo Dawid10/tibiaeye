@@ -110,6 +110,17 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "enabled": False,
         "manaReservePercent": 30,
         "groups": [],
+        # Monk mantra: press the hotkey whenever the mantra indicator pixel is lit (in battle).
+        # Pixel is in SCREEN coordinates, same as the Real-tibia-heal Monk profile.
+        "mantra": {
+            "enabled": False,
+            "hotkey": "f9",
+            "pixelX": 1003,
+            "pixelY": 107,
+            "pixelColor": [216, 150, 74],
+            "tolerance": 50,
+            "cooldown": 2.0,
+        },
     },
     "hardware": {
         "mode": "software",

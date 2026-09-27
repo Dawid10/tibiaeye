@@ -79,6 +79,7 @@ class RecorderTab(ctk.CTkFrame):
         self.recording = False
         self._previous_coord = None
         self._label_counter = 0
+        self._owned_file = None  # the route file this session loaded or saved; others need confirmation to overwrite
         self._coord_update_thread: Optional[threading.Thread] = None
         self._stop_coord_update = False
         self._selected_index: int = -1  # -1 means append at end
@@ -136,6 +137,11 @@ class RecorderTab(ctk.CTkFrame):
         create_button(
             file_frame, text="Load", command=self._load_waypoints,
             width=60,
+        ).pack(side="left", padx=(0, 5))
+
+        create_button(
+            file_frame, text="Save", command=self._save_waypoints,
+            style="accent", width=60,
         ).pack(side="left")
 
         # Status bar
@@ -326,7 +332,7 @@ class RecorderTab(ctk.CTkFrame):
             state="normal",
         )
         self.save_btn.pack(side="left")
-        _hotkey_hint(save_frame, "(F11)").pack(side="left", padx=5)
+        _hotkey_hint(save_frame, "(Cmd+S / F11)").pack(side="left", padx=5)
 
         # Clear all button
         clear_frame = ctk.CTkFrame(controls_content, fg_color="transparent")
@@ -493,6 +499,7 @@ class RecorderTab(ctk.CTkFrame):
 
             self._update_label_counter()
             self._refresh_waypoint_list()
+            self._owned_file = os.path.abspath(output_file)
             self._update_status(f"Loaded {len(self.waypoints)} waypoints")
             self._save_config()
 
@@ -564,13 +571,16 @@ class RecorderTab(ctk.CTkFrame):
         root.bind('<F9>', lambda e: self._add_label())
         root.bind('<F10>', lambda e: self._add_refill_checker())
         root.bind('<F11>', lambda e: self._save_waypoints())
+        root.bind('<Command-s>', lambda e: self._save_waypoints())  # macOS takes F11 for "Show Desktop"
+        root.bind('<Control-s>', lambda e: self._save_waypoints())
         root.bind('<Shift-F6>', lambda e: self._add_move_down())
         root.bind('<Shift-F7>', lambda e: self._add_move_up())
 
     def _unbind_shortcuts(self):
         """Unbind keyboard shortcuts."""
         root = self.winfo_toplevel()
-        for key in ['<F4>', '<F5>', '<F6>', '<F7>', '<F8>', '<F9>', '<F10>', '<F11>', '<Shift-F6>', '<Shift-F7>']:
+        for key in ['<F4>', '<F5>', '<F6>', '<F7>', '<F8>', '<F9>', '<F10>', '<F11>', '<Command-s>', '<Control-s>',
+                    '<Shift-F6>', '<Shift-F7>']:
             try:
                 root.unbind(key)
             except Exception:
@@ -741,6 +751,17 @@ class RecorderTab(ctk.CTkFrame):
 
         return filename
 
+    def _confirm_overwrite(self, output_file):
+        """A different route already on disk (e.g. Output File left from an old route) is only replaced if confirmed."""
+        if not os.path.exists(output_file) or os.path.abspath(output_file) == self._owned_file:
+            return True
+        from tkinter import messagebox
+        return messagebox.askyesno(
+            "Overwrite route?",
+            f"{os.path.basename(output_file)} already exists and is a different route.\n\n"
+            f"Replace it with these {len(self.waypoints)} waypoints?",
+        )
+
     def _save_waypoints(self):
         """Save waypoints to file."""
         output_file = self.output_file_var.get().strip()
@@ -757,6 +778,10 @@ class RecorderTab(ctk.CTkFrame):
         # Update the var with normalized path
         self.output_file_var.set(output_file)
 
+        if not self._confirm_overwrite(output_file):
+            self._update_status("Not saved - change Output File to a new name")
+            return
+
         # Ensure directory exists
         os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
 
@@ -772,6 +797,7 @@ class RecorderTab(ctk.CTkFrame):
             with open(output_file, 'w') as f:
                 json.dump(data, f, indent=2)
 
+            self._owned_file = os.path.abspath(output_file)
             self._update_status(f"Saved {len(self.waypoints)} waypoints to {os.path.basename(output_file)}")
             self._save_config()
         except IOError as e:

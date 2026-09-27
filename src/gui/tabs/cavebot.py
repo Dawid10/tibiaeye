@@ -124,6 +124,11 @@ class CavebotTab(ctk.CTkFrame):
             command=self._reload_route, width=70,
         ).pack(side="right")
 
+        create_button(
+            controls_frame, text="Clear",
+            command=self._clear_route, style="danger", width=60,
+        ).pack(side="right", padx=(0, 10))
+
         # Waypoint list
         self.waypoint_list = WaypointList(
             waypoints_section,
@@ -369,6 +374,15 @@ class CavebotTab(ctk.CTkFrame):
             self.route_file_var.set(filename)
             self._load_route()
 
+    def _clear_route(self):
+        """Unload the route: no waypoints, so the cavebot only fights what comes (targeting only)."""
+        self.waypoints = []
+        self.route_file = ""
+        self.waypoint_list.set_waypoints([])
+        self.start_waypoint_var.set("0")
+        self.route_file_var.set("")
+        self._save_config()
+
     def _load_route(self):
         """Load waypoints from the selected route file."""
         route_file = self.route_file_var.get()
@@ -451,6 +465,8 @@ class CavebotTab(ctk.CTkFrame):
         # Load route if exists (this calls _save_config, so refill must be loaded first)
         if self.route_file_var.get():
             self._load_route()
+        else:
+            self._clear_route()
 
     def _on_entry_change(self, *args):
         """Called when an entry field changes. Debounces saves."""

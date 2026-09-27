@@ -1070,8 +1070,10 @@ class GameLoop:
 
         # 3.5 Spell attack (cast offensive spells while in combat)
         try:
-            from .spell_attack import handle_spell_attack
-            self.context = handle_spell_attack(self.context, self._spell_attack_cooldowns)
+            from .spell_attack import handle_mantra, handle_spell_attack
+            # Mantra first; an attack spell in the same tick could eat its cast
+            if not handle_mantra(self.context, self._spell_attack_cooldowns):
+                self.context = handle_spell_attack(self.context, self._spell_attack_cooldowns)
         except Exception as e:
             self._bot_health.report_failure('spell_attack', e)
 

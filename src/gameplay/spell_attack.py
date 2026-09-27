@@ -21,6 +21,34 @@ from ..core.constants import (
 )
 
 
+def handle_mantra(context, cooldowns) -> bool:
+    """Monk mantra: press its hotkey when the indicator pixel is lit, in battle. Returns True if cast."""
+    from ..repositories.combat_mode import is_pixel_lit
+    from ..utils.input import get_screen_offset
+
+    mantra = context.get('spellAttack', {}).get('mantra', {})
+    if not mantra.get('enabled', False) or not mantra.get('hotkey'):
+        return False
+    if not context.get('battleList', {}).get('creatures'):
+        return False
+    now = time.time()
+    if now - cooldowns.get('mantra', 0) < mantra.get('cooldown', 2.0):
+        return False
+    screenshot_bgr = context.get('screenshotBgr')
+    if screenshot_bgr is None:
+        return False
+
+    offset_x, offset_y = get_screen_offset()
+    x, y = mantra.get('pixelX', 0) - offset_x, mantra.get('pixelY', 0) - offset_y
+    if not is_pixel_lit(screenshot_bgr, x, y, mantra.get('pixelColor', [0, 0, 0]), mantra.get('tolerance', 50)):
+        return False
+
+    pyautogui.press(mantra['hotkey'])
+    cooldowns['mantra'] = now
+    print(f"[Mantra] Indicator lit - pressing {mantra['hotkey'].upper()}")
+    return True
+
+
 def handle_spell_attack(context, cooldowns):
     """
     Main entry point. Called every tick from gameloop.

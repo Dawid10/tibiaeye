@@ -225,6 +225,8 @@ SERVER_SAVE_RECONNECT_EXTRA_WAIT = 90      # Extra seconds to wait before reconn
 # ============================================
 HOTKEY_TOGGLE_BOT = ']'                    # Start/stop the bot from any focused window (Tibia included)
 HOTKEY_TOGGLE_CAVEBOT = '['                # Cavebot (walking + attacking) on/off, even while running; healing stays on
+MANTRA_PIXEL_BOX = 3                       # Square sampled around the mantra pixel (indicators are anti-aliased)
+MANTRA_PIXEL_MIN_MATCHES = 2               # Pixels in the box that must match for "lit"
 TOAST_DURATION_MS = 1500                   # How long the on-screen "BOT STARTED" / "CAVEBOT ON" message stays
 
 # ============================================
