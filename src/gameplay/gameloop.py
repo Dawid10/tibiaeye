@@ -20,6 +20,7 @@ from ..core.constants import (
     UNREACHABLE_BLACKLIST_RADIUS, COMBAT_NO_KILL_TIMEOUT,
     SAFE_MODE_RECOVERY_INTERVAL, SAFE_MODE_RECOVERY_TIMEOUT,
     CHASE_WITH_CLIENT, CHASE_MODE_HOTKEY, CHASE_CHECK_INTERVAL, CHASE_PRESS_COOLDOWN,
+    HEAL_POTION_COOLDOWN, HEAL_SPELL_COOLDOWN, CHASE_MAX_FAILED_PRESSES, CHAT_LOOT_READING,
 )
 from ..repositories.combat_mode import count_chase_button_green, is_chase_mode_on
 from ..repositories.radar.locators import get_radar_tools_position
@@ -137,6 +138,10 @@ class GameLoop:
         # Bot health tracker (safe mode)
         self._bot_health = BotHealth()
         self._in_safe_mode = False
+
+        # Last press time per healing hotkey: without it every heal key was pressed every tick
+        self._heal_last_press = {}
+        self._chase_failed_presses = 0
 
         # Spell attack cooldowns (simple dict, separate from healing)
         self._spell_attack_cooldowns = {}
@@ -264,8 +269,9 @@ class GameLoop:
         # Skills middleware (food detection) - very slow changing
         self.add_middleware(self._skills_middleware, frequency=FREQ_SKILLS)
 
-        # Chat middleware (loot detection from chat channel)
-        self.add_middleware(self._chat_middleware, frequency=FREQ_CHAT)
+        # Chat middleware (loot messages for telemetry) - off by default, looting doesn't need it
+        if CHAT_LOOT_READING:
+            self.add_middleware(self._chat_middleware, frequency=FREQ_CHAT)
 
         # Map middleware functions to names for BotHealth reporting
         self._middleware_names = {
@@ -373,6 +379,10 @@ class GameLoop:
         # Also set in gameWindow for compatibility
         context['gameWindow']['creatures'] = creatures
         context['gameWindow']['monstersBars'] = creatures
+
+        # Quick loot right here, before the cavebot task can click the next creature
+        from .core.tasks.cavebot import loot_on_kill
+        context = loot_on_kill(context)
 
         self._bot_health.report_success('battlelist')
         return context
@@ -854,6 +864,18 @@ class GameLoop:
 
         return context
 
+    HEAL_SPELL_GROUP = 'healing spell group'
+
+    def _heal_key_ready(self, hotkey: str, cooldown: float) -> bool:
+        return time.time() - self._heal_last_press.get(hotkey, 0) >= cooldown
+
+    def _press_heal_key(self, hotkey: str) -> None:
+        import pyautogui
+        pyautogui.press(hotkey)
+        self._heal_last_press[hotkey] = time.time()
+        status = self.context.get('statusBar', {})
+        print(f"[Heal] {hotkey} at {status.get('hpPercentage', 100):.0f}% HP, {status.get('manaPercentage', 100):.0f}% mana")
+
     def _try_emergency_heal(self, healing: Dict, hp_percent: float,
                             mana_percent: float) -> bool:
         """Try emergency heal. Returns True if healed.
@@ -879,8 +901,8 @@ class GameLoop:
             spells = healing.get('spells', [])
             if spells:
                 hotkey = spells[0].get('hotkey')
-                if hotkey:
-                    pyautogui.press(hotkey)
+                if hotkey and self._heal_key_ready(hotkey, spells[0].get('cooldown', HEAL_SPELL_COOLDOWN)):
+                    self._press_heal_key(hotkey)
                     self.telemetry.track_event("heal", {
                         "healType": "emergency_spell",
                         "hotkey": hotkey,
@@ -896,8 +918,9 @@ class GameLoop:
             if potion.get('type', 'hp') != 'hp':
                 continue
             hotkey = potion.get('hotkey')
-            if hotkey:
-                pyautogui.press(hotkey)
+            if hotkey and self._heal_key_ready(hotkey, potion.get('cooldown', HEAL_POTION_COOLDOWN)):
+                self._press_heal_key(hotkey)
+                healing['lastPotionPress'] = time.time()
                 self.telemetry.track_event("heal", {
                     "healType": "emergency_potion",
                     "hotkey": hotkey,
@@ -920,14 +943,15 @@ class GameLoop:
                 continue
 
             hotkey = potion.get('hotkey')
-            if not hotkey:
+            if not hotkey or not self._heal_key_ready(hotkey, potion.get('cooldown', HEAL_POTION_COOLDOWN)):
                 continue
 
             potion_type = potion.get('type', 'hp')
             threshold = potion.get('hpPercentageLessThanOrEqual', 50)
 
             if potion_type == 'hp' and hp_percent <= threshold:
-                pyautogui.press(hotkey)
+                self._press_heal_key(hotkey)
+                healing['lastPotionPress'] = time.time()
                 self.telemetry.track_event("heal", {
                     "healType": "potion",
                     "hotkey": hotkey,
@@ -937,7 +961,8 @@ class GameLoop:
                 return True
 
             if potion_type == 'mana' and mana_percent <= threshold:
-                pyautogui.press(hotkey)
+                self._press_heal_key(hotkey)
+                healing['lastPotionPress'] = time.time()
                 self.telemetry.track_event("heal", {
                     "healType": "potion",
                     "hotkey": hotkey,
@@ -962,8 +987,10 @@ class GameLoop:
                 continue
 
             threshold = spell.get('hpPercentageLessThanOrEqual', 70)
-            if hp_percent <= threshold:
-                pyautogui.press(hotkey)
+            # Tibia healing spells share one cooldown: a second spell in the same second is wasted
+            if hp_percent <= threshold and self._heal_key_ready(self.HEAL_SPELL_GROUP, HEAL_SPELL_COOLDOWN):
+                self._press_heal_key(hotkey)
+                self._heal_last_press[self.HEAL_SPELL_GROUP] = self._heal_last_press[hotkey]
                 self.telemetry.track_event("heal", {
                     "healType": "spell",
                     "hotkey": hotkey,
@@ -1052,6 +1079,9 @@ class GameLoop:
         # 2.5 Anti-trap: attack directly when surrounded (no BFS path)
         self._check_trap()
 
+        # Waypoint picked in the GUI while running: go there now
+        self._apply_forced_waypoint()
+
         # Cavebot switched off live ([ hotkey): drop its walk/attack task, healing keeps running
         if not self.context.get('cavebot', {}).get('enabled', False) and not self.orchestrator.is_idle:
             self.orchestrator.clear()
@@ -1071,7 +1101,10 @@ class GameLoop:
         # 3.5 Spell attack (cast offensive spells while in combat)
         try:
             from .spell_attack import handle_mantra, handle_spell_attack
-            # Mantra first; an attack spell in the same tick could eat its cast
+            root_task = self.orchestrator.root_task
+            self.context.setdefault('cavebot', {})['inAttackTask'] = (
+                root_task is not None and root_task.name == 'AttackClosestCreature')
+            # Mantra first: while its indicator is lit, attack spells wait so they can't eat its cast
             if not handle_mantra(self.context, self._spell_attack_cooldowns):
                 self.context = handle_spell_attack(self.context, self._spell_attack_cooldowns)
         except Exception as e:
@@ -1088,6 +1121,9 @@ class GameLoop:
 
         # 5. Eat food periodically
         self._eat_food_if_needed()
+
+        # 5.1 Second loot press after a kill (first one may hit a potion's use-exhaust)
+        self._retry_loot()
 
         # 5.5 Keep the client's Chase Opponent mode on
         self._ensure_chase_mode()
@@ -1378,6 +1414,28 @@ class GameLoop:
                 self._last_food_time = now
                 print(f"[Food] Eating food! Food was: {food} min (hotkey: {hotkey})")
 
+    def _retry_loot(self) -> None:
+        loot = self.context.get('loot', {})
+        retry_at = loot.get('retryAt')
+        if retry_at is None or time.time() < retry_at:
+            return
+        loot.pop('retryAt')
+        if not loot.get('enabled', False):
+            return
+        import pyautogui
+        pyautogui.press(loot.get('hotkey', 'g'))
+        print("[Loot] Second loot press (a potion blocked the first)")
+
+    def _apply_forced_waypoint(self) -> None:
+        waypoints = self.context.get('cavebot', {}).get('waypoints', {})
+        index = self.context.get('cavebot', {}).pop('forceWaypoint', None)
+        if index is None or not 0 <= index < len(waypoints.get('items', [])):
+            return
+        waypoints['currentIndex'] = index
+        waypoints['indexBeforeCombat'] = None  # a fight in progress must not restore the old spot afterwards
+        self.orchestrator.clear()
+        print(f"[Cavebot] Jumping to waypoint {index} (chosen in the GUI)")
+
     def _ensure_chase_mode(self) -> None:
         """Press the chase hotkey when the chase button isn't green (like the Real-tibia-heal bot)."""
         cavebot = self.context.get('cavebot', {})
@@ -1396,14 +1454,24 @@ class GameLoop:
         if tools is None:
             return
         green = count_chase_button_green(screenshot_bgr, tools)
-        if green is None or is_chase_mode_on(green):
+        if green is None:
+            return
+        # The chase task only leaves the walking to the client once the button is seen green
+        cavebot['clientChaseOn'] = is_chase_mode_on(green)
+        if cavebot['clientChaseOn']:
+            self._chase_failed_presses = 0
             return
         if now - self._last_chase_press < CHASE_PRESS_COOLDOWN:
             return
 
         import pyautogui
         hotkey = cavebot.get('chaseHotkey', CHASE_MODE_HOTKEY)
+        if self._chase_failed_presses == CHASE_MAX_FAILED_PRESSES:
+            print(f"[Chase] WARNING: pressing {hotkey.upper()} {CHASE_MAX_FAILED_PRESSES}x did not turn Chase Opponent on. "
+                  f"Check that {hotkey.upper()} is bound to Chase Opponent in Tibia's hotkeys. "
+                  f"Until then the bot walks to monsters itself.")
         pyautogui.press(hotkey)
+        self._chase_failed_presses += 1
         self._last_chase_press = now
         print(f"[Chase] Chase mode OFF ({green} green px) - pressing {hotkey.upper()}")
 

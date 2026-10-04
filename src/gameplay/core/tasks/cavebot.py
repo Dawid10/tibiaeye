@@ -4,7 +4,8 @@ Cavebot Tasks - Tasks for cave exploration and combat.
 Attack system uses VectorTask composition:
 - ClickInClosestCreatureTask: initiates attack on closest creature (Alt+Click)
 - WalkToTargetCreatureTask: waits for creature death (Tibia auto-chase handles walking)
-- AttackClosestCreatureTask: orchestrates click → wait → loot cycle
+- AttackClosestCreatureTask: orchestrates click → wait cycle
+- loot_on_kill: quick loot when the attacked creature leaves the battle list
 """
 import time
 
@@ -17,8 +18,73 @@ from .common import WalkToCoordinateTask
 from ....utils.jitter import jitter
 from ....utils.debug_capture import save_debug_screenshot
 from ....core.constants import (
-    WALK_CREATURE_TIMEOUT, CAVEBOT_ATTACK_STUCK_TIMEOUT, CHASE_WITH_CLIENT,
+    WALK_CREATURE_TIMEOUT, CAVEBOT_ATTACK_STUCK_TIMEOUT, CHASE_WITH_CLIENT, LOOT_RETRY_DELAY, POTION_EXHAUST,
+    LOOT_ATTACK_GAP,
 )
+
+
+def press_loot(context: Context) -> bool:
+    """
+    Quick loot once, then hold the next attack click for LOOT_ATTACK_GAP: attacking starts the
+    chase, which cancels the walk to the corpse. Only if a potion went out within POTION_EXHAUST
+    (Tibia then ignores quick loot) is a second press scheduled for the gameloop.
+    """
+    loot = context.setdefault('loot', {})
+    if not loot.get('enabled', False):
+        return False
+    pyautogui.press(loot.get('hotkey', 'g'))
+    now = time.time()
+    loot['attackAfter'] = now + LOOT_ATTACK_GAP
+    if now - context.get('healing', {}).get('lastPotionPress', 0) < POTION_EXHAUST:
+        loot['retryAt'] = now + LOOT_RETRY_DELAY
+    return True
+
+
+def loot_gap_left(context: Context) -> float:
+    """Seconds the next attack click must still wait for the last loot press."""
+    return max(0.0, context.get('loot', {}).get('attackAfter', 0) - time.time())
+
+
+def count_named(creatures, name: str) -> int:
+    return sum(1 for creature in creatures if creature.name == name)
+
+
+def target_died(watched_name, watched_count: int, creatures) -> bool:
+    """
+    The creature we were attacking left the battle list. An attack that merely ended (missed
+    click, escape, timeout) leaves its row in place - no kill, nothing to loot.
+    """
+    if watched_name is None:
+        return False
+    if any(creature.is_being_attacked and creature.name == watched_name for creature in creatures):
+        return False
+    return count_named(creatures, watched_name) < watched_count
+
+
+def _loot_kill(context: Context, creature_name: str) -> None:
+    if not press_loot(context):
+        return
+    print(f"[Loot] {creature_name} died - looting")
+    gui_logger = context.get('gui_logger')
+    if gui_logger:
+        gui_logger("Looteando corpo", "success")
+
+
+def loot_on_kill(context: Context) -> Context:
+    """
+    Run on every battle list reading: quick loot the moment the attacked creature dies.
+    Cavebot only - a healing-only run never presses the loot key on the player's own kills.
+    """
+    loot = context.setdefault('loot', {})
+    creatures = context.get('battleList', {}).get('creatures', [])
+    watched_name = loot.get('watchedName')
+    cavebot_on = context.get('cavebot', {}).get('enabled', False)
+    if cavebot_on and target_died(watched_name, loot.get('watchedCount', 0), creatures):
+        _loot_kill(context, watched_name)
+    target = context.get('cavebot', {}).get('targetCreature')
+    loot['watchedName'] = getattr(target, 'name', None)
+    loot['watchedCount'] = count_named(creatures, loot['watchedName'])
+    return context
 
 
 class ClickInClosestCreatureTask(BaseTask):
@@ -33,9 +99,11 @@ class ClickInClosestCreatureTask(BaseTask):
 
     CLICK_GRACE_PERIOD = 0.5
 
-    def __init__(self):
+    def __init__(self, delay_before_start: float = 0):
         super().__init__("ClickInClosestCreature")
-        self.delay_of_timeout = 2.0
+        # Waits out the last loot press: the click would cancel the walk to the corpse
+        self.delay_before_start = delay_before_start
+        self.delay_of_timeout = 2.0 + delay_before_start
         self._click_time = 0
 
     def should_ignore(self, context: Context) -> bool:
@@ -170,7 +238,9 @@ class WalkToTargetCreatureTask(BaseTask):
         if coord is None:
             return context
 
-        if context.get('cavebot', {}).get('chaseWithClient', CHASE_WITH_CLIENT):
+        cavebot = context.get('cavebot', {})
+        # Leave the walking to the client only when its Chase button was actually seen ON
+        if cavebot.get('chaseWithClient', CHASE_WITH_CLIENT) and cavebot.get('clientChaseOn', False):
             return context
 
         target = self._get_gw_creature(context)
@@ -258,10 +328,11 @@ class AttackClosestCreatureTask(VectorTask):
     1. ClickInClosestCreatureTask → initiates attack
     2. WalkToTargetCreatureTask → walks to creature
     3. Creature dies → should_restart checks for more creatures
-    4. on_before_restart → loot, reset children
-    5. No more creatures → on_complete → final loot, restore waypoint
+    4. on_before_restart → reset children (next click waits out a loot press)
+    5. No more creatures → on_complete → restore waypoint
 
-    Tibia's auto-chase handles walking; bot handles looting between kills.
+    Tibia's auto-chase handles walking. Looting is loot_on_kill, run on every battle list
+    reading, so it only fires when the attacked creature really left the list.
     """
 
     def __init__(self):
@@ -284,7 +355,7 @@ class AttackClosestCreatureTask(VectorTask):
             self._last_target_name = getattr(closest, 'name', None)
 
         self.tasks = []
-        self.add_task(ClickInClosestCreatureTask())
+        self.add_task(ClickInClosestCreatureTask(loot_gap_left(context)))
         self.add_task(WalkToTargetCreatureTask())
 
         return context
@@ -302,7 +373,7 @@ class AttackClosestCreatureTask(VectorTask):
         return len(battle_list) > 0
 
     def on_before_restart(self, context: Context) -> Context:
-        """Loot before attacking next creature."""
+        """Reset children for the next creature (the battle list middleware already looted a kill)."""
         # Signal kill to gameloop (for combat timeout tracking)
         context['cavebot']['lastKillTime'] = time.time()
 
@@ -317,15 +388,6 @@ class AttackClosestCreatureTask(VectorTask):
             experience = wiki_creature.exp if wiki_creature else None
             telemetry.track_kill(creature_name or 'Unknown', experience=experience, position=position)
 
-        if context.get('loot', {}).get('enabled', False):
-            hotkey = context.get('loot', {}).get('hotkey', 'g')
-            pyautogui.press(hotkey)
-            print("[Attack] Looting before next target")
-
-        gui_logger = context.get('gui_logger')
-        if gui_logger:
-            gui_logger("Looteando corpo", "success")
-
         # Capture next target name before resetting children
         closest = context.get('cavebot', {}).get('closestCreature')
         if closest:
@@ -333,12 +395,12 @@ class AttackClosestCreatureTask(VectorTask):
 
         # Reset children for next cycle
         self.tasks = []
-        self.add_task(ClickInClosestCreatureTask())
+        self.add_task(ClickInClosestCreatureTask(loot_gap_left(context)))
         self.add_task(WalkToTargetCreatureTask())
         return super().on_before_restart(context)
 
     def on_complete(self, context: Context) -> Context:
-        """Final loot and restore waypoint index.
+        """Restore waypoint index once combat is over (looting happens in the battle list middleware).
 
         The orchestrator calls on_complete() BEFORE checking should_restart().
         Only do final cleanup when combat is truly over (no more reachable creatures).
@@ -388,10 +450,6 @@ class AttackClosestCreatureTask(VectorTask):
         if is_still_attacking:
             pyautogui.press('escape')
             context['cavebot']['isAttackingSomeCreature'] = False
-
-        if context.get('loot', {}).get('enabled', False):
-            hotkey = context.get('loot', {}).get('hotkey', 'g')
-            pyautogui.press(hotkey)
 
         self._restore_waypoint_index(context)
 
@@ -471,7 +529,9 @@ class LootCorpseTask(BaseTask):
         self.delay_after_complete = 0.3
 
     def do(self, context: Context) -> Context:
+        # Only created when looting is on (handle_cavebot checks), so press unconditionally
         pyautogui.press(self.hotkey)
+        context.setdefault('loot', {})['retryAt'] = time.time() + LOOT_RETRY_DELAY
         return context
 
 

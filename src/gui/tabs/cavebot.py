@@ -8,6 +8,7 @@ import json
 import os
 
 from ..components.waypoint_list import WaypointList
+from ..components.tooltip import Tooltip
 from ..theme import (
     BG_SURFACE, BG_ELEVATED, BG_INPUT, BORDER,
     TEXT_PRIMARY, TEXT_MUTED, ACCENT,
@@ -50,10 +51,11 @@ class CavebotTab(ctk.CTkFrame):
     HP_POTIONS = ["Health Potion", "Strong Health Potion", "Great Health Potion", "Ultimate Health Potion", "Supreme Health Potion"]
     MP_POTIONS = ["Mana Potion", "Strong Mana Potion", "Great Mana Potion", "Ultimate Mana Potion"]
 
-    def __init__(self, master, config_manager=None, **kwargs):
+    def __init__(self, master, config_manager=None, on_jump_to_waypoint=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
 
         self.config_manager = config_manager
+        self.on_jump_to_waypoint = on_jump_to_waypoint
         self.waypoints: List[Dict] = []
         self.route_file: str = ""
 
@@ -104,9 +106,12 @@ class CavebotTab(ctk.CTkFrame):
 
         self.start_waypoint_var = ctk.StringVar(value="0")
         self.start_waypoint_var.trace_add("write", self._on_entry_change)
-        create_entry(
+        start_entry = create_entry(
             controls_frame, textvariable=self.start_waypoint_var, width=60,
-        ).pack(side="left", padx=10)
+        )
+        start_entry.pack(side="left", padx=10)
+        start_entry.bind("<Return>", lambda e: self._on_start_waypoint_entered())
+        Tooltip(start_entry, "Where Start begins. While the bot runs: press Enter (or click a waypoint in the list) to go there now.")
 
         self.loop_var = ctk.BooleanVar(value=True)
         create_checkbox(
@@ -425,6 +430,19 @@ class CavebotTab(ctk.CTkFrame):
         """Handle waypoint click in the list."""
         self.start_waypoint_var.set(str(index))
         self.waypoint_list.set_current_index(index)
+        if self.on_jump_to_waypoint:
+            self.on_jump_to_waypoint(index)
+
+    def _on_start_waypoint_entered(self):
+        try:
+            index = int(self.start_waypoint_var.get())
+        except ValueError:
+            return
+        if not 0 <= index < len(self.waypoints):
+            return
+        self.waypoint_list.set_current_index(index)
+        if self.on_jump_to_waypoint:
+            self.on_jump_to_waypoint(index)
 
     def reload(self, config_manager):
         """Show another profile's settings in the existing widgets."""

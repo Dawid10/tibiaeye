@@ -52,7 +52,7 @@ def create_group(name='AoE', spells=None, compare='greaterThanOrEqual',
 
 def create_mock_context(mana=500, mana_percent=80, is_attacking=True,
                         monsters=None, groups=None, enabled=True,
-                        mana_reserve=30, gui_logger=None):
+                        mana_reserve=30, gui_logger=None, cavebot_enabled=True):
     if monsters is None:
         monsters = [MockCreature('Rat', (7, 4))]
     if groups is None:
@@ -63,6 +63,7 @@ def create_mock_context(mana=500, mana_percent=80, is_attacking=True,
             'manaPercentage': mana_percent,
         },
         'cavebot': {
+            'enabled': cavebot_enabled,
             'isAttackingSomeCreature': is_attacking,
         },
         'gameWindow': {
@@ -82,15 +83,26 @@ def create_mock_context(mana=500, mana_percent=80, is_attacking=True,
 class TestShouldSkip:
     """Test _should_skip conditions."""
 
+    def test_skip_when_cavebot_off(self):
+        """Healing-only runs (cavebot off) never press attack keys."""
+        context = create_mock_context(cavebot_enabled=False)
+        assert _should_skip(context) is True
+
     def test_skip_when_disabled(self):
         """Should skip when spell attack is disabled."""
         context = create_mock_context(enabled=False)
         assert _should_skip(context) is True
 
-    def test_skip_when_not_attacking(self):
-        """Should skip when not attacking any creature."""
+    def test_skip_before_the_bot_attacks(self):
+        """A monster in sight but no attack yet: casting now would hide its health bar."""
         context = create_mock_context(is_attacking=False)
         assert _should_skip(context) is True
+
+    def test_no_skip_during_attack_task_without_red_square(self):
+        """The red attack square is often not seen mid-fight: the running attack task is enough."""
+        context = create_mock_context(is_attacking=False)
+        context['cavebot']['inAttackTask'] = True
+        assert _should_skip(context) is False
 
     def test_skip_when_no_monsters(self):
         """Should skip when no monsters visible."""
@@ -487,11 +499,11 @@ class TestIntegration:
         mock_pyautogui.press.assert_not_called()
 
     @patch('src.gameplay.spell_attack.pyautogui')
-    def test_skip_when_not_attacking(self, mock_pyautogui):
-        """Should not cast when not attacking."""
+    def test_skip_when_no_monster_anywhere(self, mock_pyautogui):
+        """No monster in the battle list or on screen: nothing to cast at."""
         spells = [create_spell()]
         groups = [create_group('G1', spells)]
-        context = create_mock_context(is_attacking=False, groups=groups)
+        context = create_mock_context(is_attacking=False, groups=groups, monsters=[])
         cooldowns = {}
 
         handle_spell_attack(context, cooldowns)

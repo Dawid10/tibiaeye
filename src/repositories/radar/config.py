@@ -153,6 +153,11 @@ def _load():
     loaded_floors = 0
     for floor in floors:
         img = _load_gray_image(str(IMAGES_PATH / f"floor-{floor}.png"))
+        if img is not None:
+            # Black margin south/east: near the map's edge the minimap shows past it and could never match.
+            # Only bottom/right, so pixel (0, 0) stays at COORDINATE_OFFSET and coordinates don't shift.
+            img = cv2.copyMakeBorder(img, 0, dimensions['height'], 0, dimensions['width'],
+                                     cv2.BORDER_CONSTANT, value=0)
         floorsImgs.append(img)
         if img is not None:
             loaded_floors += 1

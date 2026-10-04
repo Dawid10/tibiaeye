@@ -18,7 +18,9 @@ def get_filled_percentage(bar) -> int:
     """Calculate filled percentage using adaptive threshold.
 
     Uses pixels 5-10 as reference (always filled), then finds where
-    3 consecutive pixels drop below reference - _DROP_THRESHOLD.
+    2 of 3 consecutive pixels drop below reference - _DROP_THRESHOLD.
+    The empty mana bar is a texture (73-94) barely darker than its fill (97): requiring all 3
+    let a lighter texture pixel hide the edge, so 51% mana read as 69%.
     """
     bar_len = len(bar)
     if bar_len < 10:
@@ -32,7 +34,8 @@ def get_filled_percentage(bar) -> int:
 
     last_filled = bar_len - 1
     for i in range(5, bar_len - 2):
-        if int(bar[i]) < threshold and int(bar[i + 1]) < threshold and int(bar[i + 2]) < threshold:
+        darker = (int(bar[i]) < threshold) + (int(bar[i + 1]) < threshold) + (int(bar[i + 2]) < threshold)
+        if int(bar[i]) < threshold and darker >= 2:
             last_filled = i - 1
             break
 

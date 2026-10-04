@@ -169,14 +169,17 @@ class TibiaVisionGUI:
         # Cavebot
         self.cavebot_tab = CavebotTab(
             self._content_area,
-            config_manager=self.config_manager
+            config_manager=self.config_manager,
+            on_jump_to_waypoint=self._jump_to_waypoint,
         )
         self._pages["cavebot"] = self.cavebot_tab
 
         # Targeting
         self.targeting_tab = TargetingTab(
             self._content_area,
-            config_manager=self.config_manager
+            config_manager=self.config_manager,
+            on_scan_unknown=self._scan_unknown_monsters,
+            on_learn_name=self._learn_monster_name,
         )
         self._pages["targeting"] = self.targeting_tab
 
@@ -394,6 +397,7 @@ class TibiaVisionGUI:
                     'hotkey': hp_config.get('hotkey', '1'),
                     'type': 'hp',
                     'hpPercentageLessThanOrEqual': hp_config.get('threshold', 30),
+                    'cooldown': hp_config.get('cooldown', 1.0),
                     'enabled': True
                 })
 
@@ -403,6 +407,7 @@ class TibiaVisionGUI:
                     'hotkey': mp_config.get('hotkey', '2'),
                     'type': 'mana',
                     'hpPercentageLessThanOrEqual': mp_config.get('threshold', 50),
+                    'cooldown': mp_config.get('cooldown', 1.0),
                     'enabled': True
                 })
             context['healing']['potions'] = potions
@@ -782,6 +787,41 @@ class TibiaVisionGUI:
         if self.running:
             self.bot_control_tab.set_status("running")
             show_toast(self.root, "BOT STARTED", "#00cc00")
+
+    def _teach_battlelist_repo(self):
+        if getattr(self, '_teach_repo', None) is None:
+            from src.repositories.battlelist import BattleListRepository
+            self._teach_repo = BattleListRepository()
+        return self._teach_repo
+
+    def _scan_unknown_monsters(self):
+        """Battle list rows the bot can't read, from the current screen."""
+        import cv2
+        from src.core import get_screen_capture
+        self._apply_window_region()
+        gray = cv2.cvtColor(get_screen_capture().capture(), cv2.COLOR_BGR2GRAY)
+        repo = self._teach_battlelist_repo()
+        creature_count = len(repo.get_creatures(gray))
+        unknown = repo.get_unknown_slots(gray)
+        self.bot_control_tab.log(f"Teach scan: {creature_count} in battle list, {len(unknown)} unknown", "info")
+        return creature_count, unknown
+
+    def _learn_monster_name(self, name_hash, name):
+        """Saved to learned_hashes.json and handed to the running bot, so no restart is needed."""
+        self._teach_battlelist_repo().learn_name(name_hash, name)
+        running_repo = getattr(self.game_loop, '_battlelist_repo', None) if self.game_loop else None
+        if running_repo is not None:
+            with self._context_lock:
+                running_repo.learn_name(name_hash, name)
+        self.bot_control_tab.log(f"Learned battle list name: {name}", "success")
+
+    def _jump_to_waypoint(self, index):
+        """Waypoint chosen in the Cavebot tab: a running bot goes there now; a stopped one starts there."""
+        if not (self.running and self.game_loop):
+            return
+        with self._context_lock:
+            self.game_loop.context['cavebot']['forceWaypoint'] = index
+        self.bot_control_tab.log(f"Going to waypoint {index}", "info")
 
     def _toggle_cavebot(self):
         """Global hotkey: cavebot (walking + attacking) on/off, live. Healing keeps running."""

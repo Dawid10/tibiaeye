@@ -109,8 +109,9 @@ class SpellAttackTab(ctk.CTkScrollableFrame):
             content, text="Enable Mantra", variable=self.mantra_enabled_var, command=self._save_config,
         )
         mantra_box.pack(anchor="w")
-        Tooltip(mantra_box, "While monsters are on the battle list, press the hotkey whenever the mantra indicator "
-                            "pixel shows its colour. Runs before attack spells, even if Spell Attack is off.")
+        Tooltip(mantra_box, "Only while the cavebot is on and monsters are on the battle list: press the hotkey "
+                            "whenever the mantra indicator pixel shows its colour. Runs before attack spells, "
+                            "even if Spell Attack is off. Healing-only runs never use it.")
 
         self.mantra_hotkey_var = ctk.StringVar(value="f9")
         self.mantra_cooldown_var = ctk.StringVar(value="2.0")

@@ -22,6 +22,9 @@ import time
 # Add src to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from src.utils.quiet_log import install_quiet_log
+install_quiet_log(sys.argv)
+
 # Load .env file based on --env flag (peek at argv before argparse)
 from dotenv import load_dotenv
 
@@ -89,6 +92,8 @@ def parse_args():
                         help='Environment to use (default: local)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Log every key press/click instead of sending it')
+    parser.add_argument('--verbose', action='store_true',
+                        help='Show every log line (walking, radar, OCR, loading)')
     return parser.parse_args()
 
 

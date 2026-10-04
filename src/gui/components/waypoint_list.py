@@ -19,6 +19,7 @@ class WaypointList(ctk.CTkFrame):
         self,
         master,
         on_waypoint_click: Optional[Callable[[int], None]] = None,
+        on_waypoint_right_click: Optional[Callable] = None,
         **kwargs
     ):
         super().__init__(master, **kwargs)
@@ -26,6 +27,7 @@ class WaypointList(ctk.CTkFrame):
         self.waypoints: List[Dict] = []
         self.current_index = 0
         self.on_waypoint_click = on_waypoint_click
+        self.on_waypoint_right_click = on_waypoint_right_click
 
         self._setup_ui()
 
@@ -75,6 +77,9 @@ class WaypointList(ctk.CTkFrame):
 
         # Bind click event
         self.textbox._textbox.bind("<Button-1>", self._on_text_click)
+        # Right click: Button-2 on macOS, Button-3 elsewhere, Ctrl+click on a one-button trackpad
+        for sequence in ("<Button-2>", "<Button-3>", "<Control-Button-1>"):
+            self.textbox._textbox.bind(sequence, self._on_text_right_click)
 
         # Footer with current waypoint info
         self.footer = ctk.CTkLabel(
@@ -252,6 +257,18 @@ class WaypointList(ctk.CTkFrame):
             self.footer.configure(text=f"Current: Waypoint {self.current_index} of {total}")
             return
         self.footer.configure(text="No waypoints loaded")
+
+    def _line_at(self, event) -> int:
+        index = self.textbox._textbox.index(f"@{event.x},{event.y}")
+        return int(index.split(".")[0]) - 1
+
+    def _on_text_right_click(self, event):
+        if not self.waypoints or not self.on_waypoint_right_click:
+            return "break"
+        line_num = self._line_at(event)
+        if 0 <= line_num < len(self.waypoints):
+            self.on_waypoint_right_click(line_num, event)
+        return "break"
 
     def _on_text_click(self, event):
         """Handle click on the text widget to select waypoint."""

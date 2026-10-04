@@ -94,7 +94,7 @@ What ended up actually helping: middleware frequency tuning (not every module ru
 | **Auto-healing** | Observer pattern — reacts to HP/Mana drops. Spells + potions with configurable thresholds |
 | **Targeting** | Whitelist or blacklist. Attacks nearest creature in range |
 | **Spell attack** | Configurable AoE and single-target spell groups with mana reserve |
-| **Loot system** | Opens corpses, collects selected items |
+| **Loot system** | Quick loot (`g`) the moment the attacked creature leaves the battle list — an attack that only ended (missed click, escape, timeout) is no kill and is not looted. The next attack click waits `LOOT_ATTACK_GAP` (0.5s) so it doesn't cancel the walk to the corpse; a second press follows only if a potion was used just before. Chat "Loot of" reading is off (`CHAT_LOOT_READING`, telemetry only) |
 | **Auto-refill** | Goes to NPC when potions run low, buys stock, deposits gold/loot, returns to hunt |
 | **Stuck detection** | Detects movement freeze and triggers audio alert |
 | **Anti-trap** | Detects when surrounded and attempts escape |
@@ -136,7 +136,7 @@ Despite all of this — **my character got banned**. BattleEye doesn't need to s
 
 The bot streams data to a companion platform — **[tibiaeye-monorepo](https://github.com/GGotha/tibiaeye-monorepo)** — via HTTP + WebSocket:
 
-- Kill events, loot, XP — batched HTTP
+- Kill events, loot, XP — batched HTTP (loot items need `CHAT_LOOT_READING = True` in `src/core/constants.py`)
 - Live character position — WebSocket (every tick)
 - **Livemap** — real-time map of where your character is walking
 - XP/h charts, kill counts, session history, browser notifications (death, low HP, stuck)

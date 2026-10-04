@@ -195,6 +195,7 @@ SPELL_ATTACK_DEFAULT_MANA_RESERVE = 30      # Default mana reserve percentage (f
 # CHAT / LOOT CHANNEL
 # ============================================
 FREQ_CHAT = 5                              # Every 5 ticks
+CHAT_LOOT_READING = False                  # Read "Loot of" lines from the loot channel (telemetry only; costs a screen scan)
 CONFIDENCE_CHAT_TAB = 0.85                 # Tab template matching
 CONFIDENCE_LOOT_TEXT = 0.80                # "Loot of" text matching
 CHAT_MAX_LOOT_LINES = 10                   # Max lines to track for hash comparison
@@ -225,6 +226,14 @@ SERVER_SAVE_RECONNECT_EXTRA_WAIT = 90      # Extra seconds to wait before reconn
 # ============================================
 HOTKEY_TOGGLE_BOT = ']'                    # Start/stop the bot from any focused window (Tibia included)
 HOTKEY_TOGGLE_CAVEBOT = '['                # Cavebot (walking + attacking) on/off, even while running; healing stays on
+HEAL_POTION_COOLDOWN = 1.0                 # Min seconds between presses of one potion key (Tibia potion exhaust)
+HEAL_SPELL_COOLDOWN = 1.0                  # Min seconds between presses of one healing spell key (Tibia heal cooldown)
+CHASE_MAX_FAILED_PRESSES = 3               # Presses of the chase hotkey without the button turning green before warning
+LOOT_RETRY_DELAY = 1.2                     # Second loot press, only if a potion was used just before the first
+POTION_EXHAUST = 1.0                       # Tibia blocks quick loot this long after a potion
+LOOT_ATTACK_GAP = 0.5                      # After a kill's loot press, wait this long before the next attack click (it cancels the walk to the corpse)
+MANTRA_ATTACK_PREHOLD = 0.5                # Attack spells wait only if a lit mantra is ready within this many seconds
+SPELL_ATTACK_DIAG_INTERVAL = 5.0           # Seconds between "[SpellAttack] not casting: <reason>" lines in combat
 MANTRA_PIXEL_BOX = 3                       # Square sampled around the mantra pixel (indicators are anti-aliased)
 MANTRA_PIXEL_MIN_MATCHES = 2               # Pixels in the box that must match for "lit"
 TOAST_DURATION_MS = 1500                   # How long the on-screen "BOT STARTED" / "CAVEBOT ON" message stays

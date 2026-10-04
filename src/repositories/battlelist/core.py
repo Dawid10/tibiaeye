@@ -238,6 +238,19 @@ def is_slot_being_attacked(content: GrayImage, slot_idx: int,
     return all_match
 
 
+def get_slot_name_hash(content: GrayImage, slot_index: int,
+                       slot_start_y: int = SLOT_START_Y,
+                       slot_height: int = SLOT_HEIGHT,
+                       name_start_x: int = NAME_START_X,
+                       name_width: int = NAME_WIDTH) -> Optional[int]:
+    """Fingerprint of the name in one battle list slot (what learned_hashes.json stores)."""
+    y = slot_start_y + (slot_index * slot_height)
+    x_end = min(content.shape[1], name_start_x + name_width)
+    if y >= content.shape[0] or x_end <= name_start_x:
+        return None
+    return hashit(normalize_text_pixels(content[y, name_start_x:x_end], name_width))
+
+
 def get_creature_name_by_hash(content: GrayImage, slot_index: int,
                                name_hashes: Dict[int, str],
                                slot_start_y: int = SLOT_START_Y,
@@ -262,7 +275,8 @@ def get_creature_name_by_hash(content: GrayImage, slot_index: int,
 def get_creature_name_by_template(content: GrayImage, slot_index: int,
                                    templates: List[dict],
                                    slot_height: int = SLOT_HEIGHT,
-                                   target_names: List[str] = None) -> str:
+                                   target_names: List[str] = None,
+                                   log_failure: bool = True) -> str:
     """Template matching fallback for creature name identification."""
     if not templates:
         return 'Unknown'
@@ -302,7 +316,7 @@ def get_creature_name_by_template(content: GrayImage, slot_index: int,
             best_confidence = max_val
             best_match = template['name']
 
-    if best_match is None:
+    if best_match is None and log_failure:
         if best_name_for_log is not None:
             print(f"[BattleList] Template match FAILED: best='{best_name_for_log}' "
                   f"score={best_score:.2f} (need {CONFIDENCE_CREATURE:.2f})")
@@ -408,6 +422,7 @@ class BattleListRepository:
         load_learned_hashes(self._name_hashes)
 
         self._learned_hashes_path = LEARNED_HASHES_PATH
+        self._unknown_hashes: set = set()  # fingerprints no template matched; skipped until taught
 
         # Logging dedup
         self._logged_hash_lookups: set = set()
@@ -514,7 +529,17 @@ class BattleListRepository:
                     logged_hash.add(name)
                 return name
 
+        # A name that already failed every template stays unknown until taught: skip ~1300 matches per tick
+        name_hash = get_slot_name_hash(content, slot_index)
+        unknown_hashes = self.__dict__.setdefault('_unknown_hashes', set())
+        if name_hash in unknown_hashes:
+            return 'Unknown'
+
         template_name = self._get_creature_name_by_template(content, slot_index, target_names)
+        if template_name == 'Unknown' and name_hash is not None and not target_names:
+            unknown_hashes.add(name_hash)
+            print(f"[BattleList] Unknown name in row {slot_index + 1} - ignored like a player. If it is a monster, "
+                  f"name it in Targeting > Unknown Monsters (teach names)")
 
         logged_tmpl = getattr(self, '_logged_template_matches', None)
         if logged_tmpl is None:
@@ -562,7 +587,7 @@ class BattleListRepository:
                 self._logged_no_templates_warning = True
 
         return get_creature_name_by_template(
-            content, slot_index, templates_to_check, self.SLOT_HEIGHT
+            content, slot_index, templates_to_check, self.SLOT_HEIGHT, log_failure=False
         )
 
     # ------------------------------------------
@@ -640,6 +665,33 @@ class BattleListRepository:
             creatures.append(creature)
 
         return creatures
+
+    def get_unknown_slots(self, screenshot: GrayImage) -> List[Tuple[int, int, GrayImage]]:
+        """Battle list rows whose name isn't recognised: (slot_index, name_hash, row_image)."""
+        content = self._get_content(screenshot)
+        if content is None:
+            return []
+        unknown = []
+        for slot_idx in range(self._get_filled_slots_count(content)):
+            if self._get_creature_name_by_hash(content, slot_idx) != 'Unknown':
+                continue
+            name_hash = get_slot_name_hash(content, slot_idx)
+            top = slot_idx * self.SLOT_HEIGHT
+            unknown.append((slot_idx, name_hash, content[top:top + self.SLOT_HEIGHT].copy()))
+        return unknown
+
+    def get_slot_hash(self, screenshot: GrayImage, slot_index: int) -> Optional[int]:
+        content = self._get_content(screenshot)
+        if content is None or slot_index >= self._get_filled_slots_count(content):
+            return None
+        return get_slot_name_hash(content, slot_index)
+
+    def learn_name(self, name_hash: int, name: str) -> None:
+        """Recognise this fingerprint as `name` from now on (this instance + learned_hashes.json)."""
+        self._name_hashes[name_hash] = name
+        self._collided_hashes.discard(name_hash)
+        self.__dict__.setdefault('_unknown_hashes', set()).discard(name_hash)
+        save_learned_hash(name_hash, name, overwrite=True)
 
     def is_attacking(self, img: Optional[np.ndarray] = None) -> bool:
         creatures = self.get_creatures(img)

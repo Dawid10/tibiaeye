@@ -21,9 +21,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.repositories.battlelist import BattleListRepository  # noqa: E402
-from src.repositories.battlelist.config import (  # noqa: E402
-    MONSTERS_PATH, hashit, normalize_text_pixels, save_learned_hash,
-)
+from src.repositories.battlelist.config import MONSTERS_PATH  # noqa: E402
 
 
 def grab_gray(file_path):
@@ -49,19 +47,11 @@ def main():
 
     gray = grab_gray(args.file)
     repo = BattleListRepository()
-    content = repo._get_content(gray)
-    if content is None:
-        print("Battle list not found on screen (is it visible, filter buttons hidden?).")
+    name_hash = repo.get_slot_hash(gray, args.slot - 1)
+    if name_hash is None:
+        print(f"No creature in battle list row {args.slot} (is the battle list visible, filter buttons hidden?).")
         return 1
-    filled = repo._get_filled_slots_count(content)
-    if not 1 <= args.slot <= filled:
-        print(f"Battle list shows {filled} creature(s); slot {args.slot} is empty.")
-        return 1
-
-    y = repo.SLOT_START_Y + (args.slot - 1) * repo.SLOT_HEIGHT
-    row = content[y, repo.NAME_START_X:min(content.shape[1], repo.NAME_START_X + repo.NAME_WIDTH)]
-    name_hash = hashit(normalize_text_pixels(row, repo.NAME_WIDTH))
-    save_learned_hash(name_hash, args.name, overwrite=True)
+    repo.learn_name(name_hash, args.name)
 
     names = [c.name for c in BattleListRepository().get_creatures(gray)]
     print(f"Saved {name_hash} -> '{args.name}'. Battle list now reads: {names}")

@@ -151,8 +151,10 @@ def save_learned_hash(hash_value: int, name: str,
 
         record_hash_learned(name, 'BL')
         print(f"[BattleList] Learned new hash for '{name}' - next time will be O(1)!")
-    except Exception:
-        pass
+    except (OSError, ValueError) as e:
+        print(f"[BattleList] ERROR: could not save learned name '{name}' to {path}: {e}")
+        if overwrite:  # an explicit teach must not fail silently
+            raise
 
 
 def load_templates(monsters_folder: str) -> List[dict]:

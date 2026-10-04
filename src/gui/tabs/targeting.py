@@ -8,7 +8,7 @@ import os
 from ..theme import (
     BG_SURFACE, BG_INPUT, BORDER,
     TEXT_PRIMARY, TEXT_MUTED, ACCENT,
-    COLOR_WARNING, COLOR_ERROR,
+    COLOR_WARNING, COLOR_ERROR, COLOR_SUCCESS,
     resolve,
 )
 from ..styles import (
@@ -20,10 +20,12 @@ from ..styles import (
 class TargetingTab(ctk.CTkScrollableFrame):
     """Targeting configuration tab with whitelist and blacklist management."""
 
-    def __init__(self, master, config_manager=None, **kwargs):
+    def __init__(self, master, config_manager=None, on_scan_unknown=None, on_learn_name=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
 
         self.config_manager = config_manager
+        self.on_scan_unknown = on_scan_unknown
+        self.on_learn_name = on_learn_name
         self.whitelist: Set[str] = set()
         self.blacklist: Set[str] = set()
         self.available_monsters: List[str] = []
@@ -33,6 +35,76 @@ class TargetingTab(ctk.CTkScrollableFrame):
         self._load_available_monsters()
         self._setup_ui()
         self._load_config()
+
+    def _setup_teach_section(self, parent):
+        """Monsters the battle list can't read on this client: show their name row, let the user name them."""
+        section = create_section(parent, "Unknown Monsters (teach names)")
+        section.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        content = ctk.CTkFrame(section, fg_color="transparent")
+        content.pack(fill="x", padx=12, pady=10)
+
+        top = ctk.CTkFrame(content, fg_color="transparent")
+        top.pack(fill="x")
+        create_button(top, "Scan battle list", self._scan_unknown, style="accent", width=140).pack(side="left")
+        ctk.CTkLabel(
+            top, text="  Rows the bot can't read are ignored like players. Name them once.",
+            font=ctk.CTkFont(size=12), text_color=TEXT_MUTED,
+        ).pack(side="left")
+
+        self._teach_rows = ctk.CTkFrame(content, fg_color="transparent")
+        self._teach_rows.pack(fill="x", pady=(8, 0))
+
+    def _scan_unknown(self):
+        for child in self._teach_rows.winfo_children():
+            child.destroy()
+        try:
+            creature_count, unknown = self.on_scan_unknown() if self.on_scan_unknown else (0, [])
+        except Exception as e:
+            ctk.CTkLabel(self._teach_rows, text=f"Scan failed: {e}", text_color=COLOR_ERROR).pack(anchor="w")
+            return
+        if not unknown:
+            text = ("Battle list is empty - scan while the monster is on it." if creature_count == 0
+                    else f"All {creature_count} battle list names are already known.")
+            ctk.CTkLabel(self._teach_rows, text=text, text_color=TEXT_MUTED).pack(anchor="w")
+            return
+        for slot_index, name_hash, row_image in unknown:
+            self._add_teach_row(slot_index, name_hash, row_image)
+
+    def _add_teach_row(self, slot_index, name_hash, row_image):
+        from PIL import Image
+        row = ctk.CTkFrame(self._teach_rows, fg_color="transparent")
+        row.pack(fill="x", pady=2)
+
+        ctk.CTkLabel(row, text=f"Row {slot_index + 1}:", width=50).pack(side="left")
+        picture = Image.fromarray(row_image)
+        image = ctk.CTkImage(light_image=picture, dark_image=picture, size=(picture.width * 2, picture.height * 2))
+        ctk.CTkLabel(row, image=image, text="").pack(side="left", padx=5)
+
+        name_var = ctk.StringVar()
+        create_entry(row, textvariable=name_var, width=180, placeholder="Monster name").pack(side="left", padx=5)
+        status = ctk.CTkLabel(row, text="", text_color=TEXT_MUTED)
+        create_button(
+            row, "Learn", lambda: self._learn(name_hash, name_var, status), style="default", width=60,
+        ).pack(side="left", padx=5)
+        status.pack(side="left", padx=5)
+
+    def _learn(self, name_hash, name_var, status):
+        import difflib
+        typed = name_var.get().strip()
+        exact = {name.lower(): name for name in self.available_monsters}
+        name = exact.get(typed.lower())
+        if name is None:
+            suggestions = difflib.get_close_matches(typed, self.available_monsters, n=3)
+            status.configure(text=f"Unknown name. Did you mean: {', '.join(suggestions) or '-'}?", text_color=COLOR_ERROR)
+            return
+        try:
+            if self.on_learn_name:
+                self.on_learn_name(name_hash, name)
+        except Exception as e:
+            status.configure(text=f"Not saved: {e}", text_color=COLOR_ERROR)
+            return
+        name_var.set(name)
+        status.configure(text="Learned and saved - the bot will attack it now", text_color=COLOR_SUCCESS)
 
     def _load_available_monsters(self):
         """Load available monster names from the battlelist/images/monsters folder."""
@@ -103,6 +175,8 @@ class TargetingTab(ctk.CTkScrollableFrame):
         blacklist_section.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
 
         self._setup_list_section(blacklist_section, "blacklist")
+
+        self._setup_teach_section(main_container)
 
         # === QUICK ADD FROM TEMPLATES ===
         templates_section = create_section(main_container, "Quick Add from Monster Templates")

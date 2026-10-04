@@ -79,6 +79,7 @@ class RecorderTab(ctk.CTkFrame):
         self.recording = False
         self._previous_coord = None
         self._label_counter = 0
+        self._user_selected = False  # MOVE HERE only acts on a row the user clicked, not the auto-selected last one
         self._owned_file = None  # the route file this session loaded or saved; others need confirmation to overwrite
         self._coord_update_thread: Optional[threading.Thread] = None
         self._stop_coord_update = False
@@ -168,6 +169,7 @@ class RecorderTab(ctk.CTkFrame):
         self.waypoint_list = WaypointList(
             waypoints_section,
             on_waypoint_click=self._on_waypoint_click,
+            on_waypoint_right_click=self._on_waypoint_right_click,
             fg_color=BG_SURFACE,
         )
         self.waypoint_list.pack(fill="both", expand=True, padx=10, pady=(0, 10))
@@ -389,7 +391,13 @@ class RecorderTab(ctk.CTkFrame):
             edit_buttons_frame, text="DELETE", command=self._delete_selected,
             style="danger", width=65,
         )
-        self.delete_btn.pack(side="left")
+        self.delete_btn.pack(side="left", padx=(0, 5))
+
+        self.move_here_btn = create_button(
+            edit_buttons_frame, text="MOVE HERE", command=self._move_selected_here,
+            style="accent", width=90,
+        )
+        self.move_here_btn.pack(side="left")
 
         # Hotkey settings section
         _separator(controls_content)
@@ -816,6 +824,7 @@ class RecorderTab(ctk.CTkFrame):
 
     def _on_waypoint_click(self, index: int):
         """Handle waypoint click in the list."""
+        self._user_selected = True
         self._selected_index = index
         self.waypoint_list.set_current_index(index)
         self._update_selection_label()
@@ -828,9 +837,11 @@ class RecorderTab(ctk.CTkFrame):
                 self.waypoint_list.set_current_index(self._selected_index)
             else:
                 self._selected_index = len(self.waypoints) - 1
+                self._user_selected = False
                 self.waypoint_list.set_current_index(self._selected_index)
         else:
             self._selected_index = -1
+            self._user_selected = False
         self._update_selection_label()
 
     def _update_selection_label(self):
@@ -868,6 +879,63 @@ class RecorderTab(ctk.CTkFrame):
 
         self._refresh_waypoint_list(keep_selection=True)
         self._update_status(f"Deleted: {removed['type']} at {removed['coordinate']}")
+
+    def _on_waypoint_right_click(self, index: int, event):
+        """Menu to fix one waypoint: change its type, move it to your tile, or delete it."""
+        import tkinter as tk
+        self._on_waypoint_click(index)
+        waypoint = self.waypoints[index]
+
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label=f"#{index}  {waypoint['type']}  {tuple(waypoint['coordinate'])}", state="disabled")
+        menu.add_separator()
+
+        change = tk.Menu(menu, tearoff=0)
+        change.add_command(label="Walk", command=lambda: self._change_type(index, "walk"))
+        change.add_command(label="Ladder (right-click it)", command=lambda: self._change_type(index, "useLadder"))
+        change.add_command(label="Rope", command=lambda: self._change_type(
+            index, "useRope", {"hotkey": self.rope_hotkey_var.get() or "t"}))
+        change.add_command(label="Shovel", command=lambda: self._change_type(
+            index, "useShovel", {"hotkey": self.shovel_hotkey_var.get() or "r"}))
+        for wp_type, label in (("moveUp", "Move up (stairs)"), ("moveDown", "Move down (stairs/hole)")):
+            directions = tk.Menu(change, tearoff=0)
+            for direction in ("north", "south", "east", "west"):
+                directions.add_command(label=direction, command=lambda t=wp_type, d=direction: self._change_type(
+                    index, t, {"direction": d}))
+            change.add_cascade(label=label, menu=directions)
+        menu.add_cascade(label="Change type to", menu=change)
+
+        menu.add_command(label="Move here (my position)", command=self._move_selected_here)
+        menu.add_separator()
+        menu.add_command(label="Delete", command=self._delete_selected)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _change_type(self, index: int, wp_type: str, options: dict = None):
+        waypoint = self.waypoints[index]
+        old_type = waypoint['type']
+        waypoint['type'] = wp_type
+        waypoint['options'] = options or {}
+        self._selected_index = index
+        self._refresh_waypoint_list(keep_selection=True)
+        self._update_status(f"[{index}] {old_type} -> {wp_type} {waypoint['options'] or ''} (Save to keep it)")
+
+    def _move_selected_here(self):
+        """Fix one waypoint: put the selected waypoint on the tile you stand on (type/options kept)."""
+        if not self._user_selected or not 0 <= self._selected_index < len(self.waypoints):
+            self._update_status("Click a waypoint in the list first")
+            return
+        coord = self._get_current_coordinate()
+        if coord is None:
+            self._update_status("ERROR: Could not detect position!")
+            return
+        waypoint = self.waypoints[self._selected_index]
+        old = waypoint['coordinate']
+        waypoint['coordinate'] = list(coord)
+        self._refresh_waypoint_list(keep_selection=True)
+        self._update_status(f"[{self._selected_index}] {waypoint['type']} moved {old} -> {list(coord)} (Save to keep it)")
 
     def _move_waypoint_up(self):
         """Move the selected waypoint up in the list."""

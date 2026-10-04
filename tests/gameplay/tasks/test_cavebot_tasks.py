@@ -829,8 +829,8 @@ class TestAttackClosestCreatureTask:
         assert task.should_restart(context) is True
 
     @patch('pyautogui.press')
-    def test_on_before_restart_loots(self, mock_press):
-        """Test on_before_restart presses loot hotkey."""
+    def test_on_before_restart_does_not_loot(self, mock_press):
+        """Looting belongs to the battle list middleware (loot_on_kill), which sees real kills only."""
         from src.gameplay.core.tasks.cavebot import AttackClosestCreatureTask
 
         task = AttackClosestCreatureTask()
@@ -844,7 +844,24 @@ class TestAttackClosestCreatureTask:
 
         task.on_before_restart(context)
 
-        mock_press.assert_called_once_with('g')
+        mock_press.assert_not_called()
+
+    @patch('pyautogui.press')
+    def test_on_before_restart_next_click_waits_out_loot(self, mock_press):
+        """The next attack click waits for the last loot press - attacking cancels the walk to the corpse."""
+        from src.gameplay.core.tasks.cavebot import AttackClosestCreatureTask
+
+        task = AttackClosestCreatureTask()
+        task.on_before_start({'cavebot': {'waypoints': {'currentIndex': 0}}})
+
+        context = {
+            'cavebot': {'waypoints': {'currentIndex': 0}},
+            'loot': {'enabled': True, 'hotkey': 'g', 'attackAfter': time.time() + 0.5},
+        }
+
+        task.on_before_restart(context)
+
+        assert 0.4 < task.tasks[0].delay_before_start <= 0.5
 
     @patch('pyautogui.press')
     def test_on_before_restart_recreates_children(self, mock_press):
@@ -870,8 +887,8 @@ class TestAttackClosestCreatureTask:
         assert isinstance(task.tasks[1], WalkToTargetCreatureTask)
 
     @patch('pyautogui.press')
-    def test_on_complete_loots_when_no_more_creatures(self, mock_press):
-        """Test on_complete triggers final loot when combat is over."""
+    def test_on_complete_does_not_loot_when_no_more_creatures(self, mock_press):
+        """The last kill was already looted by loot_on_kill; on_complete only cleans up."""
         from src.gameplay.core.tasks.cavebot import AttackClosestCreatureTask
 
         task = AttackClosestCreatureTask()
@@ -893,7 +910,7 @@ class TestAttackClosestCreatureTask:
 
         result = task.on_complete(context)
 
-        mock_press.assert_called_once_with('g')
+        mock_press.assert_not_called()
         assert result['cavebot']['targetCreature'] is None
 
     @patch('pyautogui.press')
@@ -1582,3 +1599,103 @@ class TestStuckRecoveryTierReset:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+def _bl_creature(name, attacked=False):
+    creature = Mock()
+    creature.name = name
+    creature.is_being_attacked = attacked
+    return creature
+
+
+def _loot_context(creatures, target=None, loot=None, cavebot_on=True):
+    return {
+        'battleList': {'creatures': creatures},
+        'cavebot': {'enabled': cavebot_on, 'targetCreature': target},
+        'loot': loot if loot is not None else {'enabled': True, 'hotkey': 'g'},
+    }
+
+
+class TestLootOnKill:
+    """Quick loot only when the attacked creature really left the battle list."""
+
+    @patch('pyautogui.press')
+    def test_loots_when_attacked_creature_disappears(self, mock_press):
+        from src.gameplay.core.tasks.cavebot import loot_on_kill
+
+        troll = _bl_creature('Troll', attacked=True)
+        context = loot_on_kill(_loot_context([troll, _bl_creature('Rat')], target=troll))
+        mock_press.assert_not_called()
+
+        loot_on_kill(_loot_context([_bl_creature('Rat')], loot=context['loot']))
+
+        mock_press.assert_called_once_with('g')
+        assert context['loot']['attackAfter'] > time.time()
+
+    @patch('pyautogui.press')
+    def test_no_loot_when_attack_ends_but_creature_stays(self, mock_press):
+        """Missed click, escape or timeout: the row is still there, nothing died."""
+        from src.gameplay.core.tasks.cavebot import loot_on_kill
+
+        troll = _bl_creature('Troll', attacked=True)
+        context = loot_on_kill(_loot_context([troll], target=troll))
+
+        loot_on_kill(_loot_context([_bl_creature('Troll')], loot=context['loot']))
+
+        mock_press.assert_not_called()
+
+    @patch('pyautogui.press')
+    def test_no_loot_when_another_same_name_creature_leaves(self, mock_press):
+        """Still attacking our troll - a second troll walking off screen is no kill."""
+        from src.gameplay.core.tasks.cavebot import loot_on_kill
+
+        troll = _bl_creature('Troll', attacked=True)
+        context = loot_on_kill(_loot_context([troll, _bl_creature('Troll')], target=troll))
+
+        loot_on_kill(_loot_context([troll], target=troll, loot=context['loot']))
+
+        mock_press.assert_not_called()
+
+    @patch('pyautogui.press')
+    def test_loots_when_client_switches_to_next_creature(self, mock_press):
+        """Target died and the attack frame jumped to another monster in the same reading."""
+        from src.gameplay.core.tasks.cavebot import loot_on_kill
+
+        troll = _bl_creature('Troll', attacked=True)
+        rat = _bl_creature('Rat', attacked=True)
+        context = loot_on_kill(_loot_context([troll, _bl_creature('Rat')], target=troll))
+
+        loot_on_kill(_loot_context([rat], target=rat, loot=context['loot']))
+
+        mock_press.assert_called_once_with('g')
+
+    @patch('pyautogui.press')
+    def test_no_loot_with_cavebot_off(self, mock_press):
+        """Healing-only run: the player's own kills are left alone."""
+        from src.gameplay.core.tasks.cavebot import loot_on_kill
+
+        troll = _bl_creature('Troll', attacked=True)
+        context = loot_on_kill(_loot_context([troll], target=troll, cavebot_on=False))
+
+        loot_on_kill(_loot_context([], loot=context['loot'], cavebot_on=False))
+
+        mock_press.assert_not_called()
+
+    @patch('pyautogui.press')
+    def test_no_loot_when_loot_disabled(self, mock_press):
+        from src.gameplay.core.tasks.cavebot import loot_on_kill
+
+        troll = _bl_creature('Troll', attacked=True)
+        loot = {'enabled': False, 'hotkey': 'g'}
+        loot_on_kill(_loot_context([troll], target=troll, loot=loot))
+
+        loot_on_kill(_loot_context([], loot=loot))
+
+        mock_press.assert_not_called()
+
+    def test_loot_gap_left(self):
+        from src.gameplay.core.tasks.cavebot import loot_gap_left
+
+        assert loot_gap_left({}) == 0.0
+        assert loot_gap_left({'loot': {'attackAfter': time.time() - 1}}) == 0.0
+        assert 0.9 < loot_gap_left({'loot': {'attackAfter': time.time() + 1}}) <= 1.0

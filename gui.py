@@ -18,6 +18,9 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from src.utils.quiet_log import install_quiet_log
+install_quiet_log(sys.argv)
+
 # Load .env file based on --env flag
 from dotenv import load_dotenv
 

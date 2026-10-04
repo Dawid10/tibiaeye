@@ -1,0 +1,18 @@
+{
+  "description": "Friend's OTS (official client), near Carlin, 1 Deer in battle list, full HP/MP.",
+  "resolution": "1920x1080",
+  "capture_method": "macos",
+  "capture_date": "2026-09-26",
+  "tibia_client_version": null,
+  "repositories": {
+    "battlelist": {"count": 1, "names": ["Deer"], "attacking": null},
+    "gamewindow": {"monster_count": 1, "max_false_positives": 5, "max_bar_noise": 10, "attacking": false},
+    "radar": {"found": true},
+    "statusbar": {"hp_range": [98, 100], "mana_range": [98, 100]},
+    "skills": {"detected": true},
+    "actionbar": null,
+    "inventory": null
+  },
+  "pathfinding": null,
+  "gameplay": null
+}
