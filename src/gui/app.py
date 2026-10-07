@@ -381,6 +381,8 @@ class TibiaVisionGUI:
             context['loot']['hotkey'] = general_settings.get('lootHotkey', 'g')
             context['cavebot']['chaseWithClient'] = general_settings.get('chaseWithClient', True)
             context['cavebot']['chaseHotkey'] = general_settings.get('chaseHotkey', 'p')
+            context['cavebot']['attackMethod'] = general_settings.get('attackMethod', 'space')
+            context['cavebot']['nextTargetHotkey'] = general_settings.get('nextTargetHotkey', 'space')
             context['cavebot']['mapClickWalking'] = general_settings.get('mapClickWalking', True)
 
             # Stuck alert

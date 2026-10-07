@@ -11,7 +11,7 @@ from ....core.constants import (
     WALK_COOLDOWN, WALK_TIMEOUT, WALK_STEP_TIMEOUT,
     WALK_PROGRESS_TIMEOUT, WALK_STUCK_COUNT, WALK_MAX_RECALCULATIONS,
     WALK_RETRY_SAME_DIRECTION, DEFAULT_PLAYER_SPEED, DEFAULT_TILE_FRICTION,
-    WALK_MAX_CONSECUTIVE_SKIPS, WALK_PREWALK_RATIO,
+    WALK_MAX_CONSECUTIVE_SKIPS, WALK_PREWALK_RATIO, WRONG_FLOOR_WARNING_INTERVAL,
     WALK_MAP_CLICK_ENABLED, WALK_MAP_CLICK_MIN_DISTANCE, WALK_MAP_CLICK_STALL_TIMEOUT,
     WALK_MAP_CLICK_MAX_RETRIES, MINIMAP_CLICK_MARGIN,
 )
@@ -177,7 +177,10 @@ class WalkToCoordinateTask(BaseTask):
             return context
 
         if current[2] != self.goal[2]:
-            print(f"[Walk] Cannot walk to different floor {self.goal} from {current} - skipping")
+            # Quiet while jump_back_to_current_floor is holding this waypoint - it warns on its own
+            warned_at = context.get('cavebot', {}).get('waypoints', {}).get('_wrongFloorWarnedAt', 0)
+            if time.time() - warned_at >= WRONG_FLOOR_WARNING_INTERVAL:
+                print(f"[Walk] Cannot walk to different floor {self.goal} from {current} - skipping")
             self._force_complete = True
             self._wrong_floor = True
             return context

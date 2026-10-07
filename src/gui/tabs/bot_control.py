@@ -14,6 +14,11 @@ from ..styles import (
     create_option_menu, create_description,
 )
 
+ATTACK_METHOD_LABELS = {
+    'space': "Battle list + key",
+    'click': "Click (old)",
+}
+
 
 class BotControlTab(ctk.CTkScrollableFrame):
     """Main bot control tab with start/stop/pause buttons and module toggles."""
@@ -175,6 +180,9 @@ class BotControlTab(ctk.CTkScrollableFrame):
         """Show another profile's settings in the existing widgets."""
         self.config_manager = config_manager
         get = config_manager.get
+        # Read before any .set(): variable traces save the widgets (still showing the old profile) on write
+        attack_method = get('general.attackMethod', 'space')
+        next_target_hotkey = get('general.nextTargetHotkey', 'space')
         self._profiles = profiles
         self.profile_menu.configure(values=profiles)
         self.profile_var.set(active_profile)
@@ -187,6 +195,8 @@ class BotControlTab(ctk.CTkScrollableFrame):
         self.loot_hotkey_var.set(get('general.lootHotkey', 'g'))
         self.chase_var.set(get('general.chaseWithClient', True))
         self.chase_hotkey_var.set(get('general.chaseHotkey', 'p'))
+        self.attack_method_var.set(ATTACK_METHOD_LABELS.get(attack_method, ATTACK_METHOD_LABELS['space']))
+        self.next_target_hotkey_var.set(next_target_hotkey)
         self.map_walk_var.set(get('general.mapClickWalking', True))
         self.stuck_alert_var.set(get('general.enableStuckAlert', True))
         self.stuck_timeout_var.set(str(get('general.stuckAlertTimeout', 120)))
@@ -270,6 +280,7 @@ class BotControlTab(ctk.CTkScrollableFrame):
 
         self._setup_loot_row(modules_frame)
         self._setup_chase_row(modules_frame)
+        self._setup_attack_row(modules_frame)
 
         self.map_walk_var = ctk.BooleanVar(
             value=self.config_manager.get('general.mapClickWalking', True) if self.config_manager else True
@@ -349,6 +360,34 @@ class BotControlTab(ctk.CTkScrollableFrame):
         create_entry(chase_frame, self.chase_hotkey_var, width=40).pack(side="left", padx=2)
 
         ctk.CTkLabel(chase_frame, text=")").pack(side="left")
+
+    def _setup_attack_row(self, parent):
+        attack_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        attack_frame.pack(anchor="w", pady=2)
+
+        ctk.CTkLabel(attack_frame, text="Attack:").pack(side="left")
+        method = self.config_manager.get('general.attackMethod', 'space') if self.config_manager else 'space'
+        self.attack_method_var = ctk.StringVar(value=ATTACK_METHOD_LABELS.get(method, ATTACK_METHOD_LABELS['space']))
+        attack_menu = create_option_menu(
+            attack_frame,
+            variable=self.attack_method_var,
+            values=list(ATTACK_METHOD_LABELS.values()),
+            width=200,
+            command=lambda _value: self._on_module_change(),
+        )
+        attack_menu.pack(side="left", padx=5)
+        Tooltip(attack_menu, "Battle list + key: when nothing is attacked and the battle list has a monster, press the next-target key and let Chase walk to it. Works while walking. Click (old): Alt+Click a monster the bot can path to (needs radar + game window).")
+
+        ctk.CTkLabel(attack_frame, text="key:").pack(side="left")
+        self.next_target_hotkey_var = ctk.StringVar(
+            value=self.config_manager.get('general.nextTargetHotkey', 'space') if self.config_manager else 'space'
+        )
+        self.next_target_hotkey_var.trace_add("write", lambda *args: self._on_module_change())
+        create_entry(attack_frame, self.next_target_hotkey_var, width=60).pack(side="left", padx=2)
+
+    def _attack_method(self) -> str:
+        label = self.attack_method_var.get()
+        return next((method for method, text in ATTACK_METHOD_LABELS.items() if text == label), 'space')
 
     def _setup_stuck_row(self, parent):
         stuck_frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -549,6 +588,8 @@ class BotControlTab(ctk.CTkScrollableFrame):
         self.config_manager.set('general.lootHotkey', self.loot_hotkey_var.get())
         self.config_manager.set('general.chaseWithClient', self.chase_var.get())
         self.config_manager.set('general.chaseHotkey', self.chase_hotkey_var.get())
+        self.config_manager.set('general.attackMethod', self._attack_method())
+        self.config_manager.set('general.nextTargetHotkey', self.next_target_hotkey_var.get())
         self.config_manager.set('general.mapClickWalking', self.map_walk_var.get())
         self.config_manager.set('general.enableLogging', self.logging_var.get())
         self.config_manager.set('general.enableStuckAlert', self.stuck_alert_var.get())
@@ -676,6 +717,8 @@ class BotControlTab(ctk.CTkScrollableFrame):
             'lootHotkey': self.loot_hotkey_var.get(),
             'chaseWithClient': self.chase_var.get(),
             'chaseHotkey': self.chase_hotkey_var.get(),
+            'attackMethod': self._attack_method(),
+            'nextTargetHotkey': self.next_target_hotkey_var.get(),
             'mapClickWalking': self.map_walk_var.get(),
             'enableStuckAlert': self.stuck_alert_var.get(),
             'stuckAlertTimeout': stuck_timeout,

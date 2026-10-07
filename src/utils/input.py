@@ -4,11 +4,16 @@ Input utilities - safe mouse and keyboard functions.
 Automatically adjusts mouse coordinates by the ScreenCapture region offset
 so that image-relative positions become absolute screen positions.
 """
+import os
 import random
 import time
+import traceback
 from typing import Optional, Tuple
 
 import pyautogui
+
+from ..core.constants import CLICK_GUARD_REFRESH
+from .focus_watch import remember_input
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +47,54 @@ def refresh_screen_offset() -> None:
         _cached_offset = (0, 0)
 
 
+# ---------------------------------------------------------------------------
+# Click guard: a click that lands outside Tibia (Dock, menu bar, another app)
+# takes the focus away, and every key press after it goes to the wrong app
+# until the player clicks Tibia again. Refuse those clicks and say who asked.
+# ---------------------------------------------------------------------------
+
+_tibia_regions_cache: Tuple[list, float] = ([], 0.0)
+
+
+def _tibia_regions() -> list:
+    global _tibia_regions_cache
+    regions, read_at = _tibia_regions_cache
+    now = time.time()
+    if now - read_at < CLICK_GUARD_REFRESH:
+        return regions
+    try:
+        from .window import get_tibia_windows
+        regions = [window['region'] for window in get_tibia_windows()]
+    except Exception:
+        regions = []  # no Quartz (capture card PC, other OS): can't tell, let clicks through
+    _tibia_regions_cache = (regions, now)
+    return regions
+
+
+def is_inside_tibia(x: int, y: int) -> bool:
+    """Absolute screen point inside a Tibia window. True when no Tibia window can be found."""
+    regions = _tibia_regions()
+    if not regions:
+        return True
+    return any(r.x <= x < r.x + r.width and r.y <= y < r.y + r.height for r in regions)
+
+
+def _caller() -> str:
+    """file:line of the code that asked for the click (outside this module and pyautogui)."""
+    for frame in reversed(traceback.extract_stack()[:-1]):
+        name = os.path.basename(frame.filename)
+        if name != 'input.py' and 'pyautogui' not in frame.filename:
+            return f"{name}:{frame.lineno}"
+    return "?"
+
+
+def _refused(action: str, x: int, y: int) -> bool:
+    if is_inside_tibia(x, y):
+        return False
+    print(f"[Input] Refused {action} at ({x}, {y}) - outside the Tibia window (asked by {_caller()})")
+    return True
+
+
 _original_click = pyautogui.click
 _original_moveTo = pyautogui.moveTo
 _original_rightClick = pyautogui.rightClick
@@ -52,6 +105,9 @@ def _offset_click(x=None, y=None, *args, **kwargs):
         ox, oy = _get_screen_offset()
         x += ox
         y += oy
+        if _refused('click', x, y):
+            return None
+        remember_input(f"click ({x}, {y})")
     return _original_click(x, y, *args, **kwargs)
 
 
@@ -60,6 +116,7 @@ def _offset_moveTo(x=None, y=None, *args, **kwargs):
         ox, oy = _get_screen_offset()
         x += ox
         y += oy
+        remember_input(f"moveTo ({x}, {y})")
     return _original_moveTo(x, y, *args, **kwargs)
 
 
@@ -68,6 +125,9 @@ def _offset_rightClick(x=None, y=None, **kwargs):
         ox, oy = _get_screen_offset()
         x += ox
         y += oy
+        if _refused('right click', x, y):
+            return None
+        remember_input(f"rightClick ({x}, {y})")
     return _original_rightClick(x, y, **kwargs)
 
 
@@ -77,6 +137,18 @@ def _offset_rightClick(x=None, y=None, **kwargs):
 pyautogui.click = _offset_click
 pyautogui.moveTo = _offset_moveTo
 pyautogui.rightClick = _offset_rightClick
+
+
+def _recording(name, original):
+    def send(*args, **kwargs):
+        remember_input(f"{name} {args[0] if args else ''}".strip())
+        return original(*args, **kwargs)
+    return send
+
+
+# Keys too, so the focus watchdog can list everything the bot sent before Tibia lost the input
+for _name in ('press', 'keyDown', 'keyUp', 'hotkey'):
+    setattr(pyautogui, _name, _recording(_name, getattr(pyautogui, _name)))
 
 
 # ---------------------------------------------------------------------------
@@ -125,6 +197,18 @@ def safe_click(x: int, y: int,
         time.sleep(delay_after)
 
     return (x, y)
+
+
+def alt_click(x: int, y: int) -> None:
+    """
+    Alt+Click (attack in Tibia). Option is released even if the click fails: a stuck Option
+    turns the next click on another app into "switch to it and hide Tibia" on macOS.
+    """
+    pyautogui.keyDown('alt')
+    try:
+        pyautogui.click(x, y)
+    finally:
+        pyautogui.keyUp('alt')
 
 
 def safe_press(key: str, delay_after: float = 0.0) -> None:

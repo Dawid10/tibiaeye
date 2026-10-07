@@ -81,6 +81,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "lootHotkey": "g",
         "chaseWithClient": True,
         "chaseHotkey": "p",
+        "attackMethod": "space",
+        "nextTargetHotkey": "space",
         "mapClickWalking": True,
         "stuckAlertTimeout": 120,
         "enableStuckAlert": True,

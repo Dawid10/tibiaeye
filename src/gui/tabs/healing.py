@@ -5,6 +5,7 @@ import customtkinter as ctk
 from typing import Dict, Any, List, Optional
 
 from ..components.tooltip import Tooltip
+from ...core.constants import FOOD_PRESS_INTERVAL
 from ..theme import BG_SURFACE, BG_ELEVATED, TEXT_MUTED, COLOR_ERROR
 from ..styles import (
     create_section, create_entry, create_checkbox,
@@ -182,13 +183,12 @@ class HealingTab(ctk.CTkScrollableFrame):
         food_settings = ctk.CTkFrame(food_content, fg_color="transparent")
         food_settings.pack(fill="x", pady=(10, 0))
 
-        food_label = ctk.CTkLabel(food_settings, text="Eat when food <=")
+        food_label = ctk.CTkLabel(food_settings, text=f"Presses the hotkey every {FOOD_PRESS_INTERVAL:.0f}s")
         food_label.pack(side="left")
-        Tooltip(food_label, "Quando o tempo de food restante for menor ou igual a este valor (em minutos), o bot pressiona a hotkey de food.")
+        Tooltip(food_label, "Like Real-tibia-heal: no food reading, just one press a minute. Eating while full does nothing.")
+        # Kept (not shown) so saved profiles keep their value
         self.food_threshold_var = ctk.StringVar(value="5")
         self.food_threshold_var.trace_add("write", self._on_entry_change)
-        create_entry(food_settings, textvariable=self.food_threshold_var, width=50).pack(side="left", padx=5)
-        ctk.CTkLabel(food_settings, text="minutes").pack(side="left")
 
         ctk.CTkLabel(food_settings, text="Hotkey:").pack(side="left", padx=(20, 0))
         self.food_hotkey_var = ctk.StringVar(value="f")

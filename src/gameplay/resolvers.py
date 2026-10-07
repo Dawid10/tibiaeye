@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 from ..core.constants import WALK_MAP_CLICK_ARRIVE_DISTANCE
 
+from .core.tasks.cavebot import uses_space_attack, battle_list_targets, space_attack_paused
 from .core.tasks import (
     BaseTask,
     VectorTask,
@@ -19,6 +20,7 @@ from .core.tasks import (
     UseHotkeyTask,
     SetNextWaypointTask,
     AttackClosestCreatureTask,
+    SpaceAttackTask,
     LootCorpseTask,
     RefillCheckerTask,
     DepositGoldTask,
@@ -198,8 +200,11 @@ def resolve_cavebot_tasks(context: Dict[str, Any]) -> Optional[BaseTask]:
     Returns AttackClosestCreatureTask when there are creatures to attack.
     """
     # Check all sources for creatures
-    if has_creatures_to_attack(context):
-        return AttackClosestCreatureTask()
+    if not has_creatures_to_attack(context):
+        return None
+    if uses_space_attack(context):
+        return SpaceAttackTask()
+    return AttackClosestCreatureTask()
 
     return None
 
@@ -221,8 +226,12 @@ def has_creatures_to_attack(context: Dict[str, Any]) -> bool:
     Check if there are REACHABLE creatures to attack.
 
     This is the single source of truth for deciding if we should enter combat.
-    Uses closestCreature from pathfinding - if it's None, no creature is reachable.
+    Space attack: any targetable monster in the battle list (unless it just gave up).
+    Click attack: closestCreature from pathfinding - if it's None, no creature is reachable.
     """
+    if uses_space_attack(context):
+        return bool(battle_list_targets(context)) and not space_attack_paused(context)
+
     battle_list = context.get('battleList', {}).get('creatures', [])
 
     # No creatures at all = nothing to attack

@@ -15,7 +15,7 @@ from .cavebot import handle_cavebot
 from ..core.constants import (
     TICK_RATE_DEFAULT, TICK_RATE_COMBAT, TICK_RATE_IDLE, TICK_RATE_PAUSED,
     FREQ_SCREENSHOT, FREQ_STATUSBAR, FREQ_BATTLELIST, FREQ_GAMEWINDOW,
-    FREQ_RADAR, FREQ_SKILLS, FREQ_CHAT, DELAY_FOOD_COOLDOWN, DELAY_DEBUG_INTERVAL,
+    FREQ_RADAR, FREQ_SKILLS, FREQ_CHAT, FOOD_PRESS_INTERVAL, DELAY_DEBUG_INTERVAL,
     UNREACHABLE_TARGET_GRACE_SECONDS, UNREACHABLE_BLACKLIST_DURATION,
     UNREACHABLE_BLACKLIST_RADIUS, COMBAT_NO_KILL_TIMEOUT,
     SAFE_MODE_RECOVERY_INTERVAL, SAFE_MODE_RECOVERY_TIMEOUT,
@@ -119,6 +119,10 @@ class GameLoop:
 
         # Food timer
         self._last_food_time = 0
+
+        # Logs the moment Tibia stops getting the bot's input (Dock focus, other app, mouse outside)
+        from ..utils.focus_watch import FocusWatch
+        self._focus_watch = FocusWatch()
         self._last_chase_check = 0
         self._last_chase_press = 0
 
@@ -544,9 +548,12 @@ class GameLoop:
             if self._stuck_detector.is_attack_suppressed:
                 context['cavebot']['closestCreature'] = None
 
-            # Validate current target is still reachable (not behind a wall)
+            # Validate current target is still reachable (not behind a wall). Click attack only:
+            # with space attack the client's own chase decides, and a pathfinding miss would
+            # press escape on a fight that is going fine.
+            from .core.tasks.cavebot import uses_space_attack
             is_attacking = context.get('cavebot', {}).get('isAttackingSomeCreature', False)
-            if is_attacking and filtered_monsters:
+            if is_attacking and filtered_monsters and not uses_space_attack(context):
                 target_gw = self._gamewindow_repo.get_target_creature(filtered_monsters)
                 if target_gw is not None:
                     has_target = self._gamewindow_repo.has_target_to_creature(
@@ -1103,7 +1110,7 @@ class GameLoop:
             from .spell_attack import handle_mantra, handle_spell_attack
             root_task = self.orchestrator.root_task
             self.context.setdefault('cavebot', {})['inAttackTask'] = (
-                root_task is not None and root_task.name == 'AttackClosestCreature')
+                root_task is not None and root_task.name in ('AttackClosestCreature', 'SpaceAttack'))
             # Mantra first: while its indicator is lit, attack spells wait so they can't eat its cast
             if not handle_mantra(self.context, self._spell_attack_cooldowns):
                 self.context = handle_spell_attack(self.context, self._spell_attack_cooldowns)
@@ -1121,6 +1128,9 @@ class GameLoop:
 
         # 5. Eat food periodically
         self._eat_food_if_needed()
+
+        # 5.05 Did something take the input away from Tibia?
+        self._focus_watch.check()
 
         # 5.1 Second loot press after a kill (first one may hit a potion's use-exhaust)
         self._retry_loot()
@@ -1387,7 +1397,10 @@ class GameLoop:
         self._previous_hp = hp
 
     def _eat_food_if_needed(self) -> None:
-        """Eat food when food level is low (like PyTibia)."""
+        """
+        Press the food hotkey once every FOOD_PRESS_INTERVAL, like Real-tibia-heal. Eating while
+        full costs nothing, and it doesn't depend on reading the food timer off the skills window.
+        """
         import pyautogui
 
         eat_food_config = self.context.get('healing', {}).get('eatFood', {})
@@ -1395,24 +1408,15 @@ class GameLoop:
             return
 
         hotkey = eat_food_config.get('hotkey')
-        threshold = eat_food_config.get('eatWhenFoodIsLessOrEqual', 5)  # Eat when food <= 5 minutes
-
         if not hotkey:
             return
 
-        # Get current food level
-        food = self.context.get('skills', {}).get('food')
-        if food is None:
-            return  # Skills window not detected
-
-        # Eat if food is low
-        if food <= threshold:
-            # Cooldown to avoid spamming
-            now = time.time()
-            if now - self._last_food_time >= jitter(DELAY_FOOD_COOLDOWN):
-                pyautogui.press(hotkey)
-                self._last_food_time = now
-                print(f"[Food] Eating food! Food was: {food} min (hotkey: {hotkey})")
+        now = time.time()
+        if now - self._last_food_time < FOOD_PRESS_INTERVAL:
+            return
+        pyautogui.press(hotkey)
+        self._last_food_time = now
+        print(f"[Food] Pressed {hotkey} (every {FOOD_PRESS_INTERVAL:.0f}s)")
 
     def _retry_loot(self) -> None:
         loot = self.context.get('loot', {})

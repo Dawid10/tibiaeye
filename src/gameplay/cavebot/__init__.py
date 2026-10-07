@@ -37,17 +37,17 @@ def handle_cavebot(context: Dict[str, Any], orchestrator: TasksOrchestrator) -> 
 
     # If orchestrator is busy with an attack task, let it continue
     if not is_idle:
-        # But if task is not attack-related and REACHABLE creatures appeared, interrupt!
-        # IMPORTANT: Only interrupt if closestCreature exists (pathfinding confirmed reachability)
-        closest_creature = context.get('cavebot', {}).get('closestCreature')
+        # But if task is not attack-related and creatures to attack appeared, interrupt!
+        # Click attack: only with closestCreature (pathfinding confirmed reachability).
+        # Space attack: any targetable monster in the battle list - so it fights while walking.
         uninterruptible = {
-            'AttackClosestCreature', 'ClickInClosestCreature', 'WalkToTargetCreature',
+            'AttackClosestCreature', 'ClickInClosestCreature', 'WalkToTargetCreature', 'SpaceAttack',
             'AttackTrappedCreature',
             'UseHole', 'UseRope', 'UseShovel', 'SetNextWaypoint',
             'idle', 'completing',
         }
         is_uninterruptible = current_task in uninterruptible or current_task.startswith('UseLadder')
-        if creatures and closest_creature is not None and not is_uninterruptible:
+        if has_creatures_to_attack(context) and not is_uninterruptible:
             print(f"[Cavebot] Interrupting {current_task} to attack {len(creatures)} reachable creatures!")
             task = resolve_cavebot_tasks(context)
             if task is not None:

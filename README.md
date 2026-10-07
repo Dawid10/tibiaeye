@@ -90,17 +90,19 @@ What ended up actually helping: middleware frequency tuning (not every module ru
 
 | Feature | Description |
 |---------|-------------|
-| **Cavebot** | Route-based navigation with looping, depot return, holes/ropes/stairs/ladders |
+| **Cavebot** | Route-based navigation with looping, depot return, holes/ropes/stairs/ladders. A failed floor change steps back at most 5 waypoints to retry; starting on a floor the current waypoint isn't on holds that waypoint and logs `[Walk] On floor X, but waypoint N is on floor Y - holding it` instead of jumping across the route |
 | **Auto-healing** | Observer pattern — reacts to HP/Mana drops. Spells + potions with configurable thresholds |
-| **Targeting** | Whitelist or blacklist. Attacks nearest creature in range |
+| **Targeting** | Whitelist or blacklist. Two attack methods (Settings → Attack): **Battle list + key** (default) — when the battle list has a monster and nothing is attacked, press the next-target key (`space`) once and let the client's Chase walk to it; never pressed while attacking; needs no radar/game window/pathfinding, so it also stops the route to fight while walking; gives up after 5 presses without an attack frame and walks on for 10s. **Click (old)** — Alt+Click the closest creature the pathfinding can reach (only fights once the screen stops scrolling) |
 | **Spell attack** | Configurable AoE and single-target spell groups with mana reserve |
 | **Loot system** | Quick loot (`g`) the moment the attacked creature leaves the battle list — an attack that only ended (missed click, escape, timeout) is no kill and is not looted. The next attack click waits `LOOT_ATTACK_GAP` (0.5s) so it doesn't cancel the walk to the corpse; a second press follows only if a potion was used just before. Chat "Loot of" reading is off (`CHAT_LOOT_READING`, telemetry only) |
 | **Auto-refill** | Goes to NPC when potions run low, buys stock, deposits gold/loot, returns to hunt |
-| **Stuck detection** | Detects movement freeze and triggers audio alert |
+| **Stuck detection** | Detects movement freeze: 30s escape + skip waypoint, 60s jump to the closest of the next 5 waypoints, 120s random walk + alert. Standing still while attacking doesn't count, as long as there was a kill in the last 60s (`STUCK_FIGHT_GRACE`). Skipped waypoints never jump more than 5 ahead (`WAYPOINT_JUMP_MAX_FORWARD`) |
 | **Anti-trap** | Detects when surrounded and attempts escape |
 | **Server save** | Detects save time, gracefully disconnects, reconnects after |
 | **Auto-reconnect** | Logs back in automatically after disconnection |
-| **Food auto-eat** | Keeps character fed |
+| **Food auto-eat** | Presses the food hotkey once a minute (`FOOD_PRESS_INTERVAL`), no food-timer reading needed |
+| **Focus watchdog** (macOS) | Twice a second checks that Tibia still gets the input: Dock holding keyboard focus, another app in front, or the mouse outside the Tibia window. Logs `[Focus] TIBIA LOST THE INPUT: <why>` once, with the bot's last 8 key presses/clicks and the code that sent each, then `[Focus] Tibia has the input again after Xs` |
+| **Click guard** (macOS) | Every bot click/right click is checked against the Tibia window bounds; one that would land outside (Dock, menu bar, another app — which steals the focus) is refused and logged as `[Input] Refused click at (x, y) - outside the Tibia window (asked by file:line)`. Alt+Click always releases Option |
 
 ### 👁️ Visual Detection Pipeline
 

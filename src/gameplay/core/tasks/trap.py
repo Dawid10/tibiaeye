@@ -11,6 +11,7 @@ import pyautogui
 from .base import BaseTask, Context
 from ...trap_detector import get_closest_trapped_creature
 from ....core.constants import TRAP_FALLBACK_TIMEOUT
+from ....utils.input import alt_click
 
 
 class AttackTrappedCreatureTask(BaseTask):
@@ -39,9 +40,7 @@ class AttackTrappedCreatureTask(BaseTask):
 
         if hasattr(creature, 'window_coordinate') and safe_to_click:
             x, y = creature.window_coordinate
-            pyautogui.keyDown('alt')
-            pyautogui.click(x, y)
-            pyautogui.keyUp('alt')
+            alt_click(x, y)
             self._click_time = time.time()
             print(f"[AntiTrap] Alt+Click {creature.name} at ({x}, {y})")
         else:

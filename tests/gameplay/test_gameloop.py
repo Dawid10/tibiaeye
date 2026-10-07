@@ -528,6 +528,31 @@ class TestEatFood:
         mock_press.assert_called_once_with('f')
 
     @patch('pyautogui.press')
+    def test_eat_food_without_food_reading(self, mock_press):
+        """Once a minute regardless of the food timer - the skills window may not be readable."""
+        loop = GameLoop()
+        loop.context['healing']['eatFood'] = {'enabled': True, 'hotkey': '='}
+        loop.context['skills'] = {}
+        loop._last_food_time = 0
+
+        loop._eat_food_if_needed()
+
+        mock_press.assert_called_once_with('=')
+
+    @patch('pyautogui.press')
+    def test_eat_food_again_after_a_minute(self, mock_press):
+        from src.core.constants import FOOD_PRESS_INTERVAL
+        loop = GameLoop()
+        loop.context['healing']['eatFood'] = {'enabled': True, 'hotkey': '='}
+        loop._last_food_time = time.time() - FOOD_PRESS_INTERVAL + 5
+        loop._eat_food_if_needed()
+        mock_press.assert_not_called()
+
+        loop._last_food_time = time.time() - FOOD_PRESS_INTERVAL - 1
+        loop._eat_food_if_needed()
+        mock_press.assert_called_once_with('=')
+
+    @patch('pyautogui.press')
     def test_eat_food_cooldown(self, mock_press):
         """Test that food eating has cooldown."""
         loop = GameLoop()

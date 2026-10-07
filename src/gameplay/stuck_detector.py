@@ -8,7 +8,7 @@ import pyautogui
 from ..core.constants import (
     STUCK_RECOVERY_TIER_1, STUCK_RECOVERY_TIER_2, STUCK_RECOVERY_TIER_3,
     STUCK_RECOVERY_COOLDOWN, STUCK_ATTACK_SUPPRESSION_DURATION,
-    STUCK_ATTACK_SUPPRESSION_CLEAR_DISTANCE,
+    STUCK_ATTACK_SUPPRESSION_CLEAR_DISTANCE, STUCK_FIGHT_GRACE,
 )
 from ..core.defaults import get_default
 from ..utils.alerts import get_alert_system
@@ -68,6 +68,9 @@ class StuckDetector:
 
         # Server save suppression
         self._suppressed_until: float = 0
+
+        # When the current attack started (0 = not attacking)
+        self._fight_since: float = 0
 
     @property
     def is_stuck(self) -> bool:
@@ -160,7 +163,7 @@ class StuckDetector:
             self._initialize_position(current_pos, now)
             return
 
-        if current_pos != self._last_known_position:
+        if current_pos != self._last_known_position or self._is_fighting(context, now):
             self._handle_position_changed(current_pos, now, alert_system)
             self._recovery_tier = 0
             self._is_stuck = False
@@ -191,6 +194,21 @@ class StuckDetector:
             self._execute_tier_1(context, orchestrator, current_pos, time_stuck)
             self._last_recovery_time = now
             return
+
+    def _is_fighting(self, context: Dict[str, Any], now: float) -> bool:
+        """
+        Attacking counts as progress: a melee fight stands on one tile for minutes, and treating
+        it as stuck pressed escape and skipped waypoints mid-fight. Only while the fight goes
+        somewhere - STUCK_FIGHT_GRACE without a kill (an unreachable target) is stuck again.
+        """
+        cavebot = context.get('cavebot', {})
+        if not cavebot.get('isAttackingSomeCreature', False):
+            self._fight_since = 0
+            return False
+        if self._fight_since == 0:
+            self._fight_since = now
+        last_progress = max(self._fight_since, cavebot.get('lastKillTime', 0))
+        return now - last_progress < STUCK_FIGHT_GRACE
 
     def _execute_tier_1(self, context: Dict, orchestrator, position: Tuple,
                         time_stuck: float) -> None:

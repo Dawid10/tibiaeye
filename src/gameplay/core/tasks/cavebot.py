@@ -17,10 +17,18 @@ from src.wiki.creatures import get_creature
 from .common import WalkToCoordinateTask
 from ....utils.jitter import jitter
 from ....utils.debug_capture import save_debug_screenshot
+from ....utils.input import alt_click
 from ....core.constants import (
     WALK_CREATURE_TIMEOUT, CAVEBOT_ATTACK_STUCK_TIMEOUT, CHASE_WITH_CLIENT, LOOT_RETRY_DELAY, POTION_EXHAUST,
-    LOOT_ATTACK_GAP,
+    LOOT_ATTACK_GAP, ATTACK_METHOD, NEXT_TARGET_HOTKEY, SPACE_ATTACK_MIN_GAP, SPACE_ATTACK_MAX_PRESSES,
+    SPACE_ATTACK_GIVE_UP_PAUSE,
 )
+from ....core.types import CreatureType
+from ...targeting import TargetingFilter
+
+# Tick count 1 keeps its every-100-ticks logging quiet - this runs every tick
+_battle_list_filter = TargetingFilter()
+_battle_list_filter.set_tick_count(1)
 
 
 def press_loot(context: Context) -> bool:
@@ -80,11 +88,81 @@ def loot_on_kill(context: Context) -> Context:
     watched_name = loot.get('watchedName')
     cavebot_on = context.get('cavebot', {}).get('enabled', False)
     if cavebot_on and target_died(watched_name, loot.get('watchedCount', 0), creatures):
+        context['cavebot']['lastKillTime'] = time.time()
         _loot_kill(context, watched_name)
     target = context.get('cavebot', {}).get('targetCreature')
     loot['watchedName'] = getattr(target, 'name', None)
     loot['watchedCount'] = count_named(creatures, loot['watchedName'])
     return context
+
+
+def uses_space_attack(context: Context) -> bool:
+    return context.get('cavebot', {}).get('attackMethod', ATTACK_METHOD) == 'space'
+
+
+def battle_list_targets(context: Context) -> list:
+    """Monsters in the battle list that the targeting settings allow - no radar or game window involved."""
+    creatures = context.get('battleList', {}).get('creatures', [])
+    monsters = [creature for creature in creatures if creature.creature_type == CreatureType.MONSTER]
+    return _battle_list_filter.filter(monsters, context)
+
+
+def space_attack_paused(context: Context) -> bool:
+    return time.time() < context.get('cavebot', {}).get('spaceAttackPausedUntil', 0)
+
+
+class SpaceAttackTask(BaseTask):
+    """
+    Real-tibia-heal's attack: read the battle list, and when nothing is attacked press the
+    client's next-target key once and let Chase walk to the creature. Needs no radar, game window
+    or pathfinding, so it fights while walking too. Never pressed while attacking - every press
+    switches to another creature. If the presses never produce an attack frame (creature
+    unreachable), it gives up and the route goes on for SPACE_ATTACK_GIVE_UP_PAUSE.
+    """
+
+    def __init__(self):
+        super().__init__("SpaceAttack")
+        self._last_press = 0.0
+        self._presses_without_attack = 0
+        self._gave_up = False
+
+    def do(self, context: Context) -> Context:
+        return self.ping(context)
+
+    def ping(self, context: Context) -> Context:
+        cavebot = context.get('cavebot', {})
+        if cavebot.get('isAttackingSomeCreature', False):
+            self._presses_without_attack = 0
+            return context
+        targets = battle_list_targets(context)
+        if not targets:
+            return context
+        now = time.time()
+        if now - self._last_press < SPACE_ATTACK_MIN_GAP or loot_gap_left(context) > 0:
+            return context
+        if self._presses_without_attack >= SPACE_ATTACK_MAX_PRESSES:
+            return self._give_up(context, now)
+        hotkey = cavebot.get('nextTargetHotkey', NEXT_TARGET_HOTKEY)
+        pyautogui.press(hotkey)
+        self._last_press = now
+        self._presses_without_attack += 1
+        print(f"[Attack] {hotkey} - next target ({len(targets)} in battle list, "
+              f"try {self._presses_without_attack}/{SPACE_ATTACK_MAX_PRESSES})")
+        return context
+
+    def _give_up(self, context: Context, now: float) -> Context:
+        self._gave_up = True
+        context.setdefault('cavebot', {})['spaceAttackPausedUntil'] = now + SPACE_ATTACK_GIVE_UP_PAUSE
+        print(f"[Attack] No attack after {SPACE_ATTACK_MAX_PRESSES} presses - unreachable? "
+              f"Walking on for {SPACE_ATTACK_GIVE_UP_PAUSE:.0f}s")
+        return context
+
+    def did(self, context: Context) -> bool:
+        if self._gave_up:
+            return True
+        if context.get('cavebot', {}).get('isAttackingSomeCreature', False):
+            return False
+        return not battle_list_targets(context)
 
 
 class ClickInClosestCreatureTask(BaseTask):
@@ -127,9 +205,7 @@ class ClickInClosestCreatureTask(BaseTask):
 
         if hasattr(closest, 'window_coordinate') and safe_to_click:
             x, y = closest.window_coordinate
-            pyautogui.keyDown('alt')
-            pyautogui.click(x, y)
-            pyautogui.keyUp('alt')
+            alt_click(x, y)
             self._click_time = time.time()
             print(f"[Click] Alt+Click {name} at ({x}, {y})")
         else:

@@ -6,6 +6,8 @@ This module handles:
 2. Waypoint type resolution (walk, rope, shovel, etc.)
 """
 from typing import List, Dict, Any, Optional, TypedDict
+import time
+
 import numpy as np
 
 try:
@@ -14,6 +16,7 @@ try:
 except ImportError:
     TCOD_AVAILABLE = False
 
+from ...core.constants import WRONG_FLOOR_LOOKBACK, WRONG_FLOOR_WARNING_INTERVAL, WAYPOINT_JUMP_MAX_FORWARD
 from ...repositories.radar import config as _radar_cfg
 from ...repositories.radar import (
     get_pixel_from_coordinate,
@@ -335,8 +338,9 @@ def jump_to_closest_waypoint(context: Dict[str, Any], force: bool = False) -> bo
     """
     Jump to the closest reachable waypoint, searching only forward in sequence.
 
-    Only searches the next third of waypoints to avoid jumping to return-path
-    waypoints that share the same physical location.
+    Only searches the next WAYPOINT_JUMP_MAX_FORWARD waypoints (at most a third of the route) to
+    avoid jumping to return-path waypoints that share the same physical location, or past a
+    ladder/stairs into a part of the route on another floor.
 
     Args:
         context: Game context dict
@@ -364,7 +368,9 @@ def jump_to_closest_waypoint(context: Dict[str, Any], force: bool = False) -> bo
         return False
 
     current_index = waypoints_data.get('currentIndex', 0)
-    max_forward = max(1, len(waypoints) // 3)
+    # A third of the route was 31 waypoints on a 94-waypoint route - far past ladders and stairs.
+    # +1: the search range end is exclusive
+    max_forward = min(max(1, len(waypoints) // 3), WAYPOINT_JUMP_MAX_FORWARD + 1)
 
     closest_index = _get_closest_forward_waypoint_index(
         current_coord, waypoints, current_index, max_forward,
@@ -385,6 +391,11 @@ def jump_back_to_current_floor(context: Dict[str, Any]) -> bool:
     """
     After a failed floor change, rewind to the last walk waypoint on our floor
     so the floor-change waypoint that follows it gets retried.
+
+    Looks back only WRONG_FLOOR_LOOKBACK waypoints: a failed ladder is right behind us. Searching the
+    whole route jumped a character that simply started on another floor to wherever the route last
+    visits that floor (waypoint 0 on floor 6, player on 7 -> waypoint 44). Nothing close by means
+    the player isn't on the route: hold the current waypoint and say so.
     """
     current_coord = context.get('radar', {}).get('coordinate')
     if current_coord is None:
@@ -395,7 +406,7 @@ def jump_back_to_current_floor(context: Dict[str, Any]) -> bool:
     current_index = waypoints_data.get('currentIndex', 0)
     total = len(waypoints)
 
-    for offset in range(1, total):
+    for offset in range(1, min(WRONG_FLOOR_LOOKBACK + 1, total)):
         candidate_index = (current_index - offset) % total
         waypoint = waypoints[candidate_index]
         wp_coord = waypoint.get('coordinate')
@@ -409,7 +420,21 @@ def jump_back_to_current_floor(context: Dict[str, Any]) -> bool:
               f"going back to waypoint {candidate_index} to retry the floor change")
         return True
 
+    _hold_waypoint_on_wrong_floor(waypoints_data, waypoints[current_index], current_coord)
     return False
+
+
+def _hold_waypoint_on_wrong_floor(waypoints_data: Dict[str, Any], waypoint: Dict[str, Any], current_coord) -> None:
+    current_index = waypoints_data.get('currentIndex', 0)
+    # SetNextWaypoint runs after this and adds 1 - land back on the same waypoint
+    waypoints_data['currentIndex'] = (current_index - 1) % len(waypoints_data.get('items', [waypoint]))
+    now = time.time()
+    if now - waypoints_data.get('_wrongFloorWarnedAt', 0) < WRONG_FLOOR_WARNING_INTERVAL:
+        return
+    waypoints_data['_wrongFloorWarnedAt'] = now
+    print(f"[Walk] On floor {current_coord[2]}, but waypoint {current_index} is on floor "
+          f"{waypoint.get('coordinate', [0, 0, '?'])[2]} - holding it. Move the character to that floor "
+          f"(or pick another start waypoint)")
 
 
 def resolve_goal_coordinate(coordinate: Coordinate, waypoint: Dict[str, Any]) -> Checkpoint:
